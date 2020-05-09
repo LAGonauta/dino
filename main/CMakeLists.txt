@@ -72,6 +72,7 @@ set(RESOURCE_LIST
     unified_main_content.ui
     unified_window_placeholder.ui
 
+    win32_larger_fonts.css
     theme.css
 )
 
