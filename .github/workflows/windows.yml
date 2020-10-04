@@ -1,0 +1,34 @@
+name: Hello World
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: git mingw-w64-x86_64-toolchain
+      - name: (TEMPORRARY) Change Mingw64 mirrorlist
+        run: |
+          cp .ci/mirrorlist.mingw64 /etc/pacman.d/mirrorlist.mingw64
+      - name: Install Mingw64 dependencies
+        run: |
+          .ci/install-dependencies.sh
+      - name: Windows Build
+        run: |
+          .ci/build.sh
+      - name: Package dino-windows
+        run: |
+          cd dist
+          zip -r dino-windows.zip *
+      - name: Upload dino-windows
+        uses: actions/upload-artifact@v2
+        with:
+          name: dino-windows.zip
+          path: dist/dino-windows.zip
