@@ -30,16 +30,16 @@ Section
 
 # Install all files
 SetOutPath $INSTDIR
-File /r input\
+File /r input\*.*
 
 # define uninstaller name
 WriteUninstaller $INSTDIR\uninstaller.exe
  
 # Create a shortcut for startmenu
 CreateDirectory "$SMPROGRAMS\Dino"
-CreateShortcut "$SMPROGRAMS\Dino\Dino.lnk" "$INSTDIR\input\bin\dino.exe" "" "$INSTDIR\logo.ico"
+CreateShortcut "$SMPROGRAMS\Dino\Dino.lnk" "$INSTDIR\bin\dino.exe" "" "$INSTDIR\logo.ico"
 CreateShortcut "$SMPROGRAMS\Dino\Uninstaller.lnk" "$INSTDIR\uninstaller.exe"
-CreateShortcut "$SMPROGRAMS\Dino\License.lnk" "$INSTDIR\input\LICENSE" "" "notepad.exe" 0
+CreateShortcut "$SMPROGRAMS\Dino\License.lnk" "$INSTDIR\LICENSE" "" "notepad.exe" 0
 # CreateShortcut "$SMPROGRAMS\Dino\Dino website.lnk" "https://dino.im" "" "$INSTDIR\logo.ico"
 
 SectionEnd
