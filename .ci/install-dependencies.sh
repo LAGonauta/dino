@@ -16,6 +16,7 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-gsettings-desktop-schemas \
        mingw64/mingw-w64-x86_64-qrencode \
        mingw64/mingw-w64-x86_64-ntldd-git \
-       mingw-w64-x86_64-gpgme \
+       mingw64/mingw-w64-x86_64-gpgme \
+       mingw64/mingw-w64-x86_64-nsis \
        make \
        zip

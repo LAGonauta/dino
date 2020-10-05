@@ -33,3 +33,13 @@ jobs:
         with:
           name: dino-windows
           path: dist/dino-windows.zip
+      - name : Build Windows installer
+        run: |
+          cd windows-installer/
+          cp -r LICENSE LICENSE_SHORT ../dist/* input/
+          makensis dino.nsi
+      - name: Upload Windows dino installer
+        uses: actions/upload-artifact@v2
+        with:
+          name: dino-installer-windows
+          path: windows-installer/dino-installer.exe
