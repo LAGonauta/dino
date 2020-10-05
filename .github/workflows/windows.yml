@@ -24,15 +24,15 @@ jobs:
       - name: Windows Build
         run: |
           .ci/build.sh
-      - name: Package dino-windows
-        run: |
-          cd dist
-          zip -r dino-windows.zip *
-      - name: Upload dino-windows
-        uses: actions/upload-artifact@v2
-        with:
-          name: dino-windows
-          path: dist/dino-windows.zip
+          #- name: Package dino-windows
+          #run: |
+          #cd dist
+          #zip -r dino-windows.zip *
+          #- name: Upload dino-windows
+          #uses: actions/upload-artifact@v2
+          #with:
+          #name: dino-windows
+          #path: dist/dino-windows.zip
       - name : Build Windows installer
         run: |
           cd windows-installer/
