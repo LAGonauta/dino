@@ -1,6 +1,6 @@
 #!/bin/bash
-./configure --with-libsignal-in-tree --program-prefix=${PWD}/dist --no-debug --release && \
-    make -j5 && \
+./configure --with-libsignal-in-tree --program-prefix=${PWD}/dist --no-debug --release --disable-fast-vapi && \
+    make -j$NUMBER_OF_PROCESSORS && \
     make install && \
     cd dist && \
     cp /mingw64/bin/gdbus.exe ./bin && \
