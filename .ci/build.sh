@@ -5,6 +5,13 @@
     cd dist && \
     cp /mingw64/bin/gdbus.exe ./bin && \
     cp /mingw64/bin/gspawn-win64-helper.exe ./bin && \
+    cp -r /mingw64/share/xml ./share && \
+    cp -r /mingw64/lib/enchant-2 ./lib && \
+    mkdir ./share/hunspell && \
+    curl -L -o ./share/hunspell/pt_BR.aff https://github.com/elastic/hunspell/raw/master/dicts/pt_BR/pt_BR.aff && \
+    curl -L -o ./share/hunspell/pt_BR.dic https://github.com/elastic/hunspell/raw/master/dicts/pt_BR/pt_BR.dic && \
+    curl -L -o ./share/hunspell/en_US.aff https://github.com/elastic/hunspell/raw/master/dicts/en_US/en_US.aff && \
+    curl -L -o ./share/hunspell/en_US.dic https://github.com/elastic/hunspell/raw/master/dicts/en_US/en_US.dic && \
     mkdir -p ./lib/gdk-pixbuf-2.0/ && cp -r /mingw64/lib/gdk-pixbuf-2.0 ./lib/ && \
     mkdir -p ./lib/gio/ && cp -r /mingw64/lib/gio ./lib/ && \
     mkdir -p ./share/icons && cp -r /mingw64/share/icons ./share/ && \
