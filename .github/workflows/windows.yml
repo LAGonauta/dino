@@ -15,29 +15,43 @@ jobs:
           update: true
           install: git mingw-w64-x86_64-toolchain
           release: false
+      
       - name: (TEMPORRARY) Change Mingw64 mirrorlist
         run: |
           cp .ci/mirrorlist.mingw64 /etc/pacman.d/mirrorlist.mingw64
+      
       - name: Install Mingw64 dependencies
         run: |
           .ci/install-dependencies.sh
+      
       - name: Windows Build
         run: |
           .ci/build.sh
-          #- name: Package dino-windows
-          #run: |
-          #cd dist
-          #zip -r dino-windows.zip *
-          #- name: Upload dino-windows
-          #uses: actions/upload-artifact@v2
-          #with:
-          #name: dino-windows
-          #path: dist/dino-windows.zip
+          
+      - name: Download Notification Bridge
+        run: |
+          curl -L -O https://github.com/LAGonauta/DinoWinToastNotifications/releases/download/v1.0.0/dinowintoastlib-x64.zip
+          unzip dinowintoastlib-x64.zip DinoWinToastLib.dll
+          mv DinoWinToastLib.dll dist/bin
+          rm dinowintoastlib-x64.zip
+          
+      - name: Package dino-windows
+        run: |
+          cd dist
+          zip -r dino-windows.zip *
+      
+      - name: Upload dino-windows
+        uses: actions/upload-artifact@v2
+        with:
+          name: dino-windows
+          path: dist/dino-windows.zip
+      
       - name : Build Windows installer
         run: |
           cd windows-installer/
           cp -r LICENSE LICENSE_SHORT ../dist/* input/
           makensis dino.nsi
+      
       - name: Upload Windows dino installer
         uses: actions/upload-artifact@v2
         with:
