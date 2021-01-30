@@ -24,4 +24,6 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-hunspell \
        mingw64/mingw-w64-x86_64-iso-codes \
        make \
-       zip
+       zip \
+       unzip \
+       curl
