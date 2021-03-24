@@ -1,4 +1,4 @@
-name: Hello World
+name: Windows Build
 on: [push, pull_request]
 
 jobs:
@@ -27,13 +27,6 @@ jobs:
       - name: Windows Build
         run: |
           .ci/build.sh
-          
-      - name: Download Notification Bridge
-        run: |
-          curl -L -O https://github.com/LAGonauta/DinoWinToastNotifications/releases/download/v1.0.0/dinowintoastlib-x64.zip
-          unzip dinowintoastlib-x64.zip DinoWinToastLib.dll
-          mv DinoWinToastLib.dll dist/bin
-          rm dinowintoastlib-x64.zip
           
       - name: Package dino-windows
         run: |
