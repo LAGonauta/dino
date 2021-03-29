@@ -1,5 +1,11 @@
 name: Windows Build
-on: [push, pull_request]
+on:
+  push:
+    branches:
+    - '**'
+  pull_request:
+    branches:
+    - '**'
 
 jobs:
   build:
@@ -16,10 +22,6 @@ jobs:
           install: git mingw-w64-x86_64-toolchain
           release: false
       
-      - name: (TEMPORRARY) Change Mingw64 mirrorlist
-        run: |
-          cp .ci/mirrorlist.mingw64 /etc/pacman.d/mirrorlist.mingw64
-      
       - name: Install Mingw64 dependencies
         run: |
           .ci/install-dependencies.sh
@@ -27,17 +29,13 @@ jobs:
       - name: Windows Build
         run: |
           .ci/build.sh
-          
-      - name: Package dino-windows
-        run: |
-          cd dist
-          zip -r dino-windows.zip *
       
       - name: Upload dino-windows
         uses: actions/upload-artifact@v2
         with:
           name: dino-windows
-          path: dist/dino-windows.zip
+          path: dist/
+          if-no-files-found: error
       
       - name : Build Windows installer
         run: |
