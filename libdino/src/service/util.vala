@@ -4,13 +4,13 @@ namespace Dino {
 
 public class Util {
     #if _WIN32
-    [CCode (cname = "ShellExecuteA")]
+    [CCode (cname = "ShellExecuteA", cheader_filename = "windows.h")]
     private static extern int ShellExecuteA(int* hwnd, string operation, string file, string parameters, string directory, int showCmd);
 
-    [CCode (cname = "CoInitialize")]
+    [CCode (cname = "CoInitialize", cheader_filename = "windows.h")]
     private static extern int CoInitialize(void* reserved);
 
-    [CCode (cname = "CoUninitialize")]
+    [CCode (cname = "CoUninitialize", cheader_filename = "windows.h")]
     private static extern void CoUninitialize();
 
     private static int ShellExecute(string operation, string file) {
@@ -60,7 +60,7 @@ public class Util {
 #if _WIN32
         string fileName = fileInfo.get_name();
         int fileNameLength = fileName.length;
-        int extIndex = fileName.index_of(".");
+        int extIndex = fileName.last_index_of(".");
         if (extIndex < fileNameLength)
         {
             string extension = fileName.substring(extIndex, fileNameLength - extIndex);
