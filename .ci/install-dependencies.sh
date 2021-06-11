@@ -23,6 +23,10 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-enchant \
        mingw64/mingw-w64-x86_64-hunspell \
        mingw64/mingw-w64-x86_64-iso-codes \
+       mingw64/mingw-w64-x86_64-gst-plugins-bad \
+       mingw64/mingw-w64-x86_64-gst-plugins-good \
+       mingw64/mingw-w64-x86_64-gst-plugins-base \
+       mingw64/mingw-w64-x86_64-gst-plugins-ugly \
        make \
        zip \
        unzip \
