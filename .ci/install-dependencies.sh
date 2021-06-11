@@ -11,7 +11,7 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-glib-networking \
        mingw64/mingw-w64-x86_64-libgcrypt \
        mingw64/mingw-w64-x86_64-libgee \
-       mingw64/mingw-w64-x86_64-pkg-config \
+       mingw64/mingw-w64-x86_64-pkgconfig \
        mingw64/mingw-w64-x86_64-vala \
        mingw64/mingw-w64-x86_64-gsettings-desktop-schemas \
        mingw64/mingw-w64-x86_64-qrencode \
