@@ -9,6 +9,7 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-gobject-introspection \
        mingw64/mingw-w64-x86_64-glib2 \
        mingw64/mingw-w64-x86_64-glib-networking \
+       mingw64/mingw-w64-x86_64-openssl \
        mingw64/mingw-w64-x86_64-libgcrypt \
        mingw64/mingw-w64-x86_64-libgee \
        mingw64/mingw-w64-x86_64-vala \
