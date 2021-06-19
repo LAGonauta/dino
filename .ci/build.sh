@@ -19,7 +19,7 @@
     mkdir -p ./share/locale && cp -r /mingw64/share/locale ./share/ && \
     mkdir -p ./share/glib-2.0/schemas && cp -r /mingw64/share/glib-2.0/schemas ./share/glib-2.0/ && \
     rm -r ./include && 
-    cp /mingw64/bin/libcrypto-1_1.dll . && \
+    cp /mingw64/bin/libcrypto-1_1-x64.dll . && \
     find . -iname "*.dll.a" -exec rm {} + && \
     find . -iname "*.exe" -exec ntldd {} + | grep mingw64 | awk '{print "cp /mingw64/bin/"$1" ."}' | sh && \
     find . -iname "*.dll" -exec ntldd {} + | grep mingw64 | awk '{print "cp /mingw64/bin/"$1" ."}' | sh && \
