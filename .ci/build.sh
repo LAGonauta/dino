@@ -25,6 +25,4 @@
     find . -iname "*.dll" -exec ntldd {} + | grep mingw64 | awk '{print "cp /mingw64/bin/"$1" ."}' | sh && \
     find . -iname "*.exe" -exec ldd {} + | grep mingw64 | awk '{print "cp /mingw64/bin/"$1" ."}' | sh && \
     find . -iname "*.dll" -exec ldd {} + | grep mingw64 | awk '{print "cp /mingw64/bin/"$1" ."}' | sh && \
-    find . -iname "*.exe" -exec strip -s {} + && \
-    find . -iname "*.dll" -exec strip -s {} + && \
     mv *.dll ./bin
