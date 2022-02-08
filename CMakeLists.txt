@@ -130,6 +130,7 @@ endif ()
 if (NOT ("all" IN_LIST VALA_WARN OR "qualifier" IN_LIST VALA_WARN))
     AddCFlagIfSupported(VALA_CFLAGS -Wno-discarded-qualifiers)
     AddCFlagIfSupported(VALA_CFLAGS -Wno-discarded-array-qualifiers)
+    AddCFlagIfSupported(VALA_CFLAGS -Wno-incompatible-pointer-types-discards-qualifiers)
 endif ()
 
 if (NOT ("all" IN_LIST VALA_WARN OR "deprecated" IN_LIST VALA_WARN))
@@ -179,6 +180,7 @@ if (NOT NO_DEBUG)
 endif (NOT NO_DEBUG)
 
 if (WIN32)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_POSIX_C_SOURCE=1")
     set(CMAKE_VALA_FLAGS "${CMAKE_VALA_FLAGS} --define=_WIN32")
 endif(WIN32)
 
