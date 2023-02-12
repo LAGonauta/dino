@@ -6,14 +6,20 @@ using Dino.Entities;
 
 namespace Dino.Ui {
 
-public interface ConversationTitlebar : Widget {
+public interface ConversationTitlebar : Object {
     public abstract string? subtitle { get; set; }
     public abstract string? title { get; set; }
 
-    public abstract void insert_entry(Plugins.ConversationTitlebarEntry entry);
+    public abstract void insert_button(Widget button);
+    public abstract Widget get_widget();
+
+    public abstract bool back_button_visible{ get; set; }
+    public signal void back_pressed();
 }
 
-public class ConversationTitlebarNoCsd : ConversationTitlebar, Gtk.Box {
+public class ConversationTitlebarNoCsd : ConversationTitlebar, Object {
+
+    public Box main = new Box(Orientation.HORIZONTAL, 0);
 
     public string? title {
         get { return title_label.label; }
@@ -28,54 +34,91 @@ public class ConversationTitlebarNoCsd : ConversationTitlebar, Gtk.Box {
         }
     }
 
-    private Box widgets_box = new Box(Orientation.HORIZONTAL, 0) { margin_start=15, valign=Align.END, visible=true };
-    private Label title_label = new Label("") { ellipsize=EllipsizeMode.END, visible=true };
+    public bool back_button_visible {
+        get { return back_revealer.reveal_child; }
+        set { back_revealer.reveal_child = value; }
+    }
+
+    private Box widgets_box = new Box(Orientation.HORIZONTAL, 7) { margin_start=15, valign=Align.END };
+    private Label title_label = new Label("") { ellipsize=EllipsizeMode.END };
     private Label subtitle_label = new Label("") { use_markup=true, ellipsize=EllipsizeMode.END, visible=false };
+    private Revealer back_revealer;
 
     construct {
-        Box content_box = new Box(Orientation.HORIZONTAL, 0) { margin=5, margin_start=15, margin_end=10, hexpand=true, visible=true };
-        this.add(content_box);
+        Box content_box = new Box(Orientation.HORIZONTAL, 0) { margin_start=15, margin_end=10, hexpand=true };
+        main.append(content_box);
 
-        Box titles_box = new Box(Orientation.VERTICAL, 0) { valign=Align.CENTER, hexpand=true, visible=true };
-        content_box.add(titles_box);
+        back_revealer = new Revealer() { visible = true, transition_type = RevealerTransitionType.SLIDE_RIGHT, transition_duration = 200, can_focus = false, reveal_child = false };
+        Button back_button = new Button.from_icon_name("go-previous-symbolic") { visible = true, valign = Align.CENTER, use_underline = true };
+        back_button.get_style_context().add_class("image-button");
+        back_button.clicked.connect(() => back_pressed());
+        back_revealer.set_child(back_button);
+        content_box.append(back_revealer);
 
-        titles_box.add(title_label);
+        Box titles_box = new Box(Orientation.VERTICAL, 0) { valign=Align.CENTER, hexpand=true };
+        content_box.append(titles_box);
+
+        titles_box.append(title_label);
         subtitle_label.attributes = new AttrList();
-        subtitle_label.get_style_context().add_class("dim-label");
-        titles_box.add(subtitle_label);
+        subtitle_label.add_css_class("dim-label");
+        titles_box.append(subtitle_label);
 
-        content_box.add(widgets_box);
+        content_box.append(widgets_box);
     }
 
     public ConversationTitlebarNoCsd() {
-        this.get_style_context().add_class("dino-header-right");
+        main.add_css_class("dino-header-right");
     }
 
-    public void insert_entry(Plugins.ConversationTitlebarEntry entry) {
-        Plugins.ConversationTitlebarWidget widget = entry.get_widget(Plugins.WidgetType.GTK);
-        if (widget != null) {
-            Button gtk_widget = (Gtk.Button) widget;
-            gtk_widget.relief = ReliefStyle.NONE;
-            widgets_box.pack_end(gtk_widget);
-        }
+    public void insert_button(Widget button) {
+        widgets_box.prepend(button);
+    }
+
+    public Widget get_widget() {
+        return main;
     }
 }
 
-public class ConversationTitlebarCsd : ConversationTitlebar, Gtk.HeaderBar {
+public class ConversationTitlebarCsd : ConversationTitlebar, Object {
 
-    public new string? title { get { return this.get_title(); } set { base.set_title(value); } }
-    public new string? subtitle { get { return this.get_subtitle(); } set { base.set_subtitle(value); } }
-
-    public ConversationTitlebarCsd() {
-        this.get_style_context().add_class("dino-right");
-        show_close_button = true;
-        hexpand = true;
+    public new string? title { get { return title_label.label; } set { title_label.label = value; } }
+    public new string? subtitle { get { return subtitle_label.label; } set { subtitle_label.label = value; subtitle_label.visible = (value != null); } }
+    public bool back_button_visible {
+        get { return back_revealer.reveal_child; }
+        set { back_revealer.reveal_child = value; }
     }
 
-    public void insert_entry(Plugins.ConversationTitlebarEntry entry) {
-        Plugins.ConversationTitlebarWidget widget = entry.get_widget(Plugins.WidgetType.GTK);
-        Button gtk_widget = (Gtk.Button)widget;
-        this.pack_end(gtk_widget);
+    public Adw.HeaderBar header_bar = new Adw.HeaderBar();
+    private Label title_label = new Label("") { ellipsize=EllipsizeMode.END };
+    private Label subtitle_label = new Label("") { ellipsize=EllipsizeMode.END, visible=false };
+    private Revealer back_revealer;
+
+    public ConversationTitlebarCsd() {
+        Box titles_box = new Box(Orientation.VERTICAL, 0) { valign=Align.CENTER };
+        title_label.attributes = new AttrList();
+        title_label.attributes.insert(Pango.attr_weight_new(Weight.BOLD));
+        titles_box.append(title_label);
+        subtitle_label.attributes = new AttrList();
+        subtitle_label.attributes.insert(Pango.attr_scale_new(Pango.Scale.SMALL));
+        subtitle_label.add_css_class("dim-label");
+        titles_box.append(subtitle_label);
+
+        back_revealer = new Revealer() { visible = true, transition_type = RevealerTransitionType.SLIDE_RIGHT, transition_duration = 200, can_focus = false, reveal_child = false };
+        Button back_button = new Button.from_icon_name("go-previous-symbolic") { visible = true, valign = Align.CENTER, use_underline = true };
+        back_button.get_style_context().add_class("image-button");
+        back_button.clicked.connect(() => back_pressed());
+        back_revealer.set_child(back_button);
+        header_bar.pack_start(back_revealer);
+
+        header_bar.set_title_widget(titles_box);
+    }
+
+    public void insert_button(Widget button) {
+        header_bar.pack_end(button);
+    }
+
+    public Widget get_widget() {
+        return header_bar;
     }
 }
 

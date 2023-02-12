@@ -4,7 +4,7 @@ using Dino.Entities;
 using Dino.Ui;
 using Xmpp;
 
-public class Dino.Ui.Application : Gtk.Application, Dino.Application {
+public class Dino.Ui.Application : Adw.Application, Dino.Application {
     private const string[] KEY_COMBINATION_QUIT = {"<Ctrl>Q", null};
     private const string[] KEY_COMBINATION_ADD_CHAT = {"<Ctrl>T", null};
     private const string[] KEY_COMBINATION_ADD_CONFERENCE = {"<Ctrl>G", null};
@@ -32,10 +32,6 @@ public class Dino.Ui.Application : Gtk.Application, Dino.Application {
         init();
         Environment.set_application_name("Dino");
         Window.set_default_icon_name("im.dino.Dino");
-
-        CssProvider provider = new CssProvider();
-        provider.load_from_resource("/im/dino/Dino/theme.css");
-        StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
 
         create_actions();
         add_main_option_entries(options);
@@ -68,7 +64,7 @@ public class Dino.Ui.Application : Gtk.Application, Dino.Application {
                 var desktop_env = Environment.get_variable("XDG_CURRENT_DESKTOP");
                 if (desktop_env == null || !desktop_env.down().contains("gnome")) {
                     if (this.active_window != null) {
-                        this.active_window.urgency_hint = true;
+//                        this.active_window.urgency_hint = true;
                     }
                 }
             });
@@ -80,7 +76,7 @@ public class Dino.Ui.Application : Gtk.Application, Dino.Application {
                 config = new Config(db);
                 window = new MainWindow(this, stream_interactor, db, config);
                 controller.set_window(window);
-                if ((get_flags() & ApplicationFlags.IS_SERVICE) == ApplicationFlags.IS_SERVICE) window.delete_event.connect(window.hide_on_delete);
+                if ((get_flags() & ApplicationFlags.IS_SERVICE) == ApplicationFlags.IS_SERVICE) window.hide_on_close = true;
             }
             window.present();
         });
@@ -203,11 +199,6 @@ public class Dino.Ui.Application : Gtk.Application, Dino.Application {
             Builder builder = new Builder.from_resource("/im/dino/Dino/shortcuts.ui");
             ShortcutsWindow dialog = (ShortcutsWindow) builder.get_object("shortcuts-window");
             if (!use_csd()) {
-                // Hack to prevent CRITICAL in Gtk when trying to destroy non-existant headerbar
-                Widget shortcuts_hack = dialog.get_titlebar();
-                dialog.destroy.connect_after(() => {
-                    shortcuts_hack = null;
-                });
                 dialog.set_titlebar(null);
             }
             dialog.title = _("Keyboard Shortcuts");
@@ -273,49 +264,49 @@ public class Dino.Ui.Application : Gtk.Application, Dino.Application {
         string? version = Dino.get_version().strip().length == 0 ? null : Dino.get_version();
         if (version != null && !version.contains("git")) {
             switch (version.substring(0, 3)) {
-                case "0.2": version = @"$version - <span font_style='italic'>Mexican Caribbean Coral Reefs</span>"; break;
-                case "0.3": version = @"$version - <span font_style='italic'>Theikenmeer</span>"; break;
+                case "0.2": version = @"$version - Mexican Caribbean Coral Reefs"; break;
+                case "0.3": version = @"$version - Theikenmeer"; break;
+                case "0.4": version = @"$version - Ilulissat"; break;
             }
         }
-        Gtk.AboutDialog dialog = new Gtk.AboutDialog();
-        dialog.destroy_with_parent = true;
-        dialog.transient_for = window;
-        dialog.modal = true;
-        dialog.title = _("About Dino");
-
-        dialog.logo_icon_name = "im.dino.Dino";
-        dialog.program_name = "Dino";
-        dialog.version = version;
-        dialog.comments = "Dino. Communicating happiness.";
-        dialog.website = "https://dino.im/";
-        dialog.website_label = "dino.im";
-        dialog.copyright = "Copyright © 2016-2022 - Dino Team";
-        dialog.license_type = License.GPL_3_0;
-
-        dialog.response.connect((response_id) => {
-            if (response_id == Gtk.ResponseType.CANCEL || response_id == Gtk.ResponseType.DELETE_EVENT) {
-                dialog.destroy();
-            }
-        });
+#if Adw_1_2
+        Adw.AboutWindow about_window = new Adw.AboutWindow();
+        about_window.application_icon = "im.dino.Dino";
+        about_window.application_name = "Dino";
+        about_window.issue_url = "https://github.com/dino/dino/issues";
+#else
+        Gtk.AboutDialog about_window = new Gtk.AboutDialog();
+        about_window.logo_icon_name = "im.dino.Dino";
+        about_window.program_name = "Dino";
+        about_window.website_label = "dino.im";
+#endif
+        about_window.destroy_with_parent = true;
+        about_window.transient_for = window;
+        about_window.modal = true;
+        about_window.title = _("About Dino");
+        about_window.version = version;
+        about_window.website = "https://dino.im/";
+        about_window.copyright = "Copyright © 2016-2023 - Dino Team";
+        about_window.license_type = License.GPL_3_0;
 
         if (!use_csd()) {
-            dialog.set_titlebar(null);
+            about_window.set_titlebar(null);
         }
-        dialog.present();
+        about_window.present();
     }
 
     private void show_join_muc_dialog(Account? account, string jid) {
         Dialog dialog = new Dialog.with_buttons(_("Join Channel"), window, Gtk.DialogFlags.MODAL | Gtk.DialogFlags.USE_HEADER_BAR, _("Join"), ResponseType.OK, _("Cancel"), ResponseType.CANCEL);
         dialog.modal = true;
         Button ok_button = dialog.get_widget_for_response(ResponseType.OK) as Button;
-        ok_button.get_style_context().add_class("suggested-action");
+        ok_button.add_css_class("suggested-action");
         ConferenceDetailsFragment conference_fragment = new ConferenceDetailsFragment(stream_interactor) { ok_button=ok_button };
         conference_fragment.jid = jid;
         if (account != null)  {
             conference_fragment.account = account;
         }
         Box content_area = dialog.get_content_area();
-        content_area.add(conference_fragment);
+        content_area.append(conference_fragment);
         conference_fragment.joined.connect(() => {
             dialog.destroy();
         });

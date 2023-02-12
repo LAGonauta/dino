@@ -12,17 +12,7 @@ protected class ConferenceDetailsFragment : Box {
 
     public signal void joined();
 
-    public bool done {
-        get {
-            try {
-                Jid parsed_jid = new Jid(jid);
-                return parsed_jid.localpart != null && parsed_jid.resourcepart == null && nick != null;
-            } catch (InvalidJidError e) {
-                return false;
-            }
-        }
-        private set {}
-    }
+    public bool done { get; private set; }
 
     public Account account {
         owned get { return account_combobox.selected; }
@@ -41,6 +31,7 @@ protected class ConferenceDetailsFragment : Box {
             jid_label.label = value;
             jid_entry.text = value;
             jid_stack.set_visible_child_name("label");
+            check_if_done();
         }
     }
     public string? nick {
@@ -49,6 +40,7 @@ protected class ConferenceDetailsFragment : Box {
             nick_label.label = value ?? "";
             nick_entry.text = value ?? "";
             nick_stack.set_visible_child_name("label");
+            check_if_done();
         }
     }
     public string? password {
@@ -114,12 +106,14 @@ protected class ConferenceDetailsFragment : Box {
 
         account_combobox.changed.connect(() => { accounts_label.label = account_combobox.selected.bare_jid.to_string(); });
         accounts_label.label = account_combobox.selected.bare_jid.to_string();
-        jid_entry.key_release_event.connect(on_jid_key_release_event);
-        nick_entry.key_release_event.connect(on_nick_key_release_event);
-        password_entry.key_release_event.connect(on_password_key_release_event);
+//        jid_entry.key_release_event.connect(on_jid_key_release_event);
+//        nick_entry.key_release_event.connect(on_nick_key_release_event);
+//        password_entry.key_release_event.connect(on_password_key_release_event);
 
-        jid_entry.key_release_event.connect(() => { done = true; return false; }); // just for notifying
-        nick_entry.key_release_event.connect(() => { done = true; return false; });
+        jid_entry.changed.connect(() => { check_if_done(); });
+        nick_entry.changed.connect(() => { check_if_done(); });
+
+        check_if_done();
 
         notification_button.clicked.connect(() => { notification_revealer.set_reveal_child(false); });
 
@@ -195,25 +189,34 @@ protected class ConferenceDetailsFragment : Box {
         notification_revealer.set_reveal_child(true);
     }
 
-    private bool on_jid_key_release_event(EventKey event) {
-        jid_label.label = jid_entry.text;
-        if (event.keyval == Key.Return) jid_stack.set_visible_child_name("label");
-        return false;
+    private void check_if_done() {
+        try {
+            Jid parsed_jid = new Jid(jid);
+            done = parsed_jid.localpart != null && parsed_jid.resourcepart == null && nick != null;
+        } catch (InvalidJidError e) {
+            done = false;
+        }
     }
 
-    private bool on_nick_key_release_event(EventKey event) {
-        nick_label.label = nick_entry.text;
-        if (event.keyval == Key.Return) nick_stack.set_visible_child_name("label");
-        return false;
-    }
-
-    private bool on_password_key_release_event(EventKey event) {
-        string filler = "";
-        for (int i = 0; i < password_entry.text.length; i++) filler += password_entry.get_invisible_char().to_string();
-        password_label.label = filler;
-        if (event.keyval == Key.Return) password_stack.set_visible_child_name("label");
-        return false;
-    }
+//    private bool on_jid_key_release_event(EventKey event) {
+//        jid_label.label = jid_entry.text;
+//        if (event.keyval == Key.Return) jid_stack.set_visible_child_name("label");
+//        return false;
+//    }
+//
+//    private bool on_nick_key_release_event(EventKey event) {
+//        nick_label.label = nick_entry.text;
+//        if (event.keyval == Key.Return) nick_stack.set_visible_child_name("label");
+//        return false;
+//    }
+//
+//    private bool on_password_key_release_event(EventKey event) {
+//        string filler = "";
+//        for (int i = 0; i < password_entry.text.length; i++) filler += password_entry.get_invisible_char().to_string();
+//        password_label.label = filler;
+//        if (event.keyval == Key.Return) password_stack.set_visible_child_name("label");
+//        return false;
+//    }
 
     private void set_active_stack(Stack stack) {
         stack.set_visible_child_name("entry");

@@ -3,6 +3,10 @@
  * It provides sane defaults for things that are very Dino-specific.
  */
 
+statuspage {
+    opacity: 0.5;
+}
+
 window.dino-main .dino-header-right {
     background: @theme_base_color;
 }
@@ -27,8 +31,8 @@ window.dino-main .dino-conversation viewport /* Some themes set this */ {
 }
 
 @keyframes highlight {
-    from { background: alpha(@warning_color, 0.5) }
-    to { background: transparent }
+    from { background: alpha(@warning_color, 0.5); }
+    to { background: transparent; }
 }
 
 window.dino-main .dino-conversation .highlight-once {
@@ -38,8 +42,16 @@ window.dino-main .dino-conversation .highlight-once {
     animation-name: highlight;
 }
 
-window.dino-main .dino-conversation .message-box:hover {
-    background: alpha(@theme_fg_color, 0.04);
+window.dino-main .dino-conversation .message-box.highlight {
+    background: @window_bg_color;
+}
+
+window.dino-main .dino-conversation .message-box {
+    padding: 6px 15px 6px 15px;
+}
+
+window.dino-main .dino-conversation .message-box:not(.has-skeleton) {
+    padding-left: 58px;
 }
 
 window.dino-main .unread-count-notify {
@@ -47,7 +59,7 @@ window.dino-main .unread-count-notify {
     color: @theme_base_color;
     font-family: monospace;
     border-radius: 999em;
-    padding: .2em .41em;
+    padding: 0 .35em;
 }
 
 window.dino-main .unread-count-notify:backdrop {
@@ -74,13 +86,10 @@ window.dino-main .dino-sidebar > frame {
     border-bottom: 1px solid @borders;
 }
 
+/* Message */
+
 .message-box {
     transition: background .05s ease;
-}
-
-window.dino-main .circular-button {
-    padding: 0;
-    border-radius: 1000px;
 }
 
 window.dino-main .dino-conversation .message-box.edit-mode {
@@ -99,6 +108,32 @@ window.dino-main .dino-conversation .message-box.error:hover {
     background: alpha(@error_color, 0.12);
 }
 
+window.dino-main .dino-quote {
+    border-left: 3px solid alpha(@theme_fg_color, 0.2);
+    background: alpha(@theme_fg_color, 0.05);
+    border-color: alpha(@theme_fg_color, 0.2);
+    padding: 10px;
+}
+
+window.dino-main .dino-quote:hover {
+    background: alpha(@theme_fg_color, 0.08);
+}
+
+/* Overlay Toolbar */
+
+.dino-main .overlay-toolbar {
+    padding: 2px;
+    border-radius: 6px;
+    border-spacing: 0;
+}
+
+.dino-main .overlay-toolbar > * {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* File Widget */
+
 window.dino-main .file-box-outer,
 window.dino-main .call-box-outer {
     background: @theme_base_color;
@@ -113,7 +148,7 @@ window.dino-main .call-box {
 
 window.dino-main .file-image-widget {
     border: 1px solid alpha(@theme_fg_color, 0.1);
-    border-radius: 3px;
+    border-radius: 6px;
 }
 
 window.dino-main .file-image-widget .file-box-outer {
@@ -132,6 +167,12 @@ window.dino-main .file-image-widget .file-box-outer button:hover {
     background: rgba(100, 100, 100, 0.5);
 }
 
+.dino-main .file-image-widget picture {
+    border-radius: 6px;
+}
+
+/* Call widget */
+
 window.dino-main .call-box-outer.incoming {
     border-color: alpha(@theme_selected_bg_color, 0.3);
 }
@@ -142,8 +183,31 @@ window.dino-main .incoming-call-box {
 
 window.dino-main .multiparty-participants {
     border-top: 1px solid alpha(@theme_fg_color, 0.05);
-    background: alpha(@theme_fg_color, 0.04)
+    background: alpha(@theme_fg_color, 0.04);
 }
+
+/* Reactions */
+
+.dino-main .reaction-grid button {
+    min-height: 16px;
+    min-width: 30px;
+    padding: 4px;
+}
+
+.dino-main .reaction-grid button.own-reaction,
+.dino-main .reaction-grid .own-reaction button {
+    background-color: alpha(@accent_bg_color, 0.1);
+    border: 1px solid @accent_bg_color;
+    padding: 3px;
+    color: @accent_color;
+}
+
+.dino-main .reaction-grid button.own-reaction:hover,
+.dino-main .reaction-grid .own-reaction button:hover {
+    background-color: alpha(@accent_bg_color, 0.2);
+}
+
+/* Sidebar */
 
 window.dino-main .dino-sidebar > frame.collapsed {
     border-bottom: 1px solid @borders;
@@ -157,6 +221,8 @@ window.dino-main .dino-sidebar frame.auto-complete list > row {
     transition: none;
 }
 
+/* File overlay */
+
 window.dino-main .dino-white-overlay {
     background: @theme_base_color;
 }
@@ -167,38 +233,46 @@ window.dino-main .dino-file-overlay {
     box-shadow: 0 2px 3px alpha(black, 0.1);
 }
 
+/* Chat Input*/
+
 window.dino-main .dino-chatinput frame box {
     background: transparent;
 }
 
-window.dino-main button.dino-attach-button {
-    min-width: 24px; /* Make button the same with as avatars */
+window.dino-main .dino-attach-button {
+    min-width: 24px; /* Make button the same width as avatars */
 }
 
-window.dino-main button.dino-chatinput-button {
+window.dino-main .dino-attach-button,
+window.dino-main .dino-chatinput-button button {
     border: none;
     background: transparent;
     box-shadow: none;
     min-height: 0;
     padding: 7px 5px;
-    color: alpha(@theme_fg_color, 0.6);
+    color: alpha(@theme_fg_color, 0.7);
     outline: none;
 }
 
-window.dino-main button.dino-chatinput-button:hover {
+window.dino-main .dino-attach-button:hover,
+window.dino-main .dino-chatinput-button button:hover {
     color: @theme_selected_bg_color;
 }
 
-window.dino-main button.dino-chatinput-button:backdrop {
+window.dino-main .dino-attach-button:backdrop,
+window.dino-main .dino-chatinput-button button:backdrop {
     color: alpha(@theme_unfocused_fg_color, 0.6);
 }
 
-window.dino-main button.dino-chatinput-button:active,
-window.dino-main button.dino-chatinput-button:checked {
+window.dino-main .dino-attach-button:active,
+window.dino-main .dino-attach-button:checked,
+window.dino-main .dino-chatinput-button button:active,
+window.dino-main .dino-chatinput-button button:checked {
     color: alpha(@theme_selected_bg_color, 0.8);
 }
 
-window.dino-main button.dino-chatinput-button:checked:backdrop {
+window.dino-main .dino-attach-button:checked:backdrop,
+window.dino-main .dino-chatinput-button button:checked:backdrop {
     color: alpha(@theme_unfocused_selected_bg_color, 0.8);
 }
 
@@ -228,7 +302,7 @@ box.dino-input-warning label {
 
 /*Chat input error*/
 
-box.dino-input-error frame border {
+box.dino-input-error frame {
     border-color: @error_color;
 }
 
@@ -237,19 +311,20 @@ box.dino-input-error frame separator {
     border: none;
 }
 
-box.dino-input-error label {
+box.dino-input-error .chat-input-status {
     color: @error_color;
 }
 
 @keyframes input-error-highlight {
-    0% { color: mix(@error_color, @theme_fg_color, 0.3);}
-    30% { color: @error_color; text-shadow: 0px 0px 2px alpha(@error_color, 0.4); }
-    100% { color: mix(@error_color, @theme_fg_color, 0.3); }
+    0% { transform: translate(0,0); }
+    25% { transform: translate(-10px,0); }
+    75% { transform: translate(10px,0); }
+    100% { transform: translate(0,0); }
 }
 
-box.dino-input-error label.input-status-highlight-once {
-    animation-duration: 1s;
-    animation-timing-function: linear;
+box.dino-input-error .chat-input-status.input-status-highlight-once {
+    animation-duration: 0.5s;
+    animation-timing-function: ease-in-out;
     animation-iteration-count: 1;
     animation-name: input-error-highlight;
 }
@@ -291,7 +366,7 @@ box.dino-input-error label.input-status-highlight-once {
     background: rgba(255,255,255,0.25);
 }
 
-.dino-call-window button.call-mediadevice-settings-button {
+.dino-call-window menubutton.call-mediadevice-settings-button button.toggle {
     border-radius: 1000px;
     min-height: 0;
     min-width: 0;
@@ -300,8 +375,8 @@ box.dino-input-error label.input-status-highlight-once {
     transition-duration: 0;
 }
 
-.dino-call-window button.call-mediadevice-settings-button:hover,
-.dino-call-window button.call-mediadevice-settings-button:checked { /* Effect that makes the button slightly larger on hover :) */
+.dino-call-window menubutton.call-mediadevice-settings-button button.toggle:hover,
+.dino-call-window menubutton.call-mediadevice-settings-button button.toggle:checked { /* Effect that makes the button slightly larger on hover :) */
     border-radius: 1000px;
     min-height: 0;
     min-width: 0;
@@ -309,7 +384,7 @@ box.dino-input-error label.input-status-highlight-once {
     margin: 0;
 }
 
-.dino-call-window .participant-header-bar {
+.dino-call-window .participant-header-bar .titles {
     background: none;
     border: none;
     border-radius: 0;
@@ -357,7 +432,7 @@ box.dino-input-error label.input-status-highlight-once {
 
 .dino-call-window .participant-name {
     color: white;
-    text-shadow: black;
+    text-shadow: 1px 1px 2px black;
 }
 
 .dino-call-window .text-no-controls {
@@ -371,6 +446,6 @@ box.dino-input-error label.input-status-highlight-once {
     box-shadow: 0 0 2px 0 rgba(0,0,0,0.5);
 }
 
-.qrcode-container {
+.qrcode-container > contents {
     background: white;  /* Color of the quiet zone. MUST have the same "reflectance" as light modules of the QR code. */
 }

@@ -24,6 +24,8 @@ public class ChatInputController : Object {
     private Plugins.InputFieldStatus input_field_status;
     private ChatTextViewController chat_text_view_controller;
 
+    private ContentItem? quoted_content_item = null;
+
     public ChatInputController(ChatInput.View chat_input, StreamInteractor stream_interactor) {
         this.chat_input = chat_input;
         this.status_description_label = chat_input.chat_input_status;
@@ -34,9 +36,12 @@ public class ChatInputController : Object {
 
         reset_input_field_status();
 
-        chat_input.chat_text_view.text_view.buffer.changed.connect(on_text_input_changed);
-        chat_input.chat_text_view.text_view.key_press_event.connect(on_text_input_key_press);
+        var text_input_key_events = new EventControllerKey() { name = "dino-text-input-controller-key-events" };
+        text_input_key_events.key_pressed.connect(on_text_input_key_press);
+        chat_input.chat_text_view.text_view.add_controller(text_input_key_events);
+
         chat_input.chat_text_view.text_view.paste_clipboard.connect(() => clipboard_pasted());
+        chat_input.chat_text_view.text_view.buffer.changed.connect(on_text_input_changed);
 
         chat_text_view_controller.send_text.connect(send_text);
 
@@ -50,17 +55,39 @@ public class ChatInputController : Object {
         status_description_label.activate_link.connect((uri) => {
             if (uri == OPEN_CONVERSATION_DETAILS_URI){
                 ContactDetails.Dialog contact_details_dialog = new ContactDetails.Dialog(stream_interactor, conversation);
-                contact_details_dialog.set_transient_for((Gtk.Window) chat_input.get_toplevel());
+                contact_details_dialog.set_transient_for((Gtk.Window) chat_input.get_root());
                 contact_details_dialog.present();
             }
             return true;
         });
+
+        SimpleAction quote_action = new SimpleAction("quote", new VariantType.tuple(new VariantType[]{VariantType.INT32, VariantType.INT32}));
+        quote_action.activate.connect((variant) => {
+            int conversation_id = variant.get_child_value(0).get_int32();
+            Conversation? conversation = stream_interactor.get_module(ConversationManager.IDENTITY).get_conversation_by_id(conversation_id);
+            if (conversation == null || !this.conversation.equals(conversation)) return;
+
+            int content_item_id = variant.get_child_value(1).get_int32();
+            ContentItem? content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_item_by_id(conversation, content_item_id);
+            if (content_item == null) return;
+
+            quoted_content_item = content_item;
+            var quote_model = new Quote.Model.from_content_item(content_item, conversation, stream_interactor) { can_abort = true };
+            quote_model.aborted.connect(() => {
+                quoted_content_item = null;
+                chat_input.unset_quoted_message();
+            });
+            chat_input.set_quoted_message(Quote.get_widget(quote_model));
+        });
+        GLib.Application.get_default().add_action(quote_action);
     }
 
     public void set_conversation(Conversation conversation) {
-        this.conversation = conversation;
-
         reset_input_field_status();
+        this.quoted_content_item = null;
+        chat_input.unset_quoted_message();
+
+        this.conversation = conversation;
 
         chat_input.encryption_widget.set_conversation(conversation);
 
@@ -74,11 +101,13 @@ public class ChatInputController : Object {
         chat_input.set_file_upload_active(active);
     }
 
-    private void on_encryption_changed(Plugins.EncryptionListEntry? encryption_entry) {
+    private void on_encryption_changed(Encryption encryption) {
         reset_input_field_status();
 
-        if (encryption_entry == null) return;
+        if (encryption == Encryption.NONE) return;
 
+        Application app = GLib.Application.get_default() as Application;
+        var encryption_entry = app.plugin_registry.encryption_list_entries[encryption];
         encryption_entry.encryption_activated(conversation, set_input_field_status);
     }
 
@@ -106,7 +135,7 @@ public class ChatInputController : Object {
         }
 
         string text = chat_input.chat_text_view.text_view.buffer.text;
-        chat_input.chat_text_view.text_view.buffer.text = "";
+
         if (text.has_prefix("/")) {
             string[] token = text.split(" ", 2);
             switch(token[0]) {
@@ -136,7 +165,7 @@ public class ChatInputController : Object {
                 case "/ping":
                     Xmpp.XmppStream? stream = stream_interactor.get_stream(conversation.account);
                     try {
-                        stream.get_module(Xmpp.Xep.Ping.Module.IDENTITY).send_ping.begin(stream, conversation.counterpart.with_resource(token[1]), null);
+                        stream.get_module(Xmpp.Xep.Ping.Module.IDENTITY).send_ping.begin(stream, conversation.counterpart.with_resource(token[1]));
                     } catch (Xmpp.InvalidJidError e) {
                         warning("Could not ping invalid Jid: %s", e.message);
                     }
@@ -159,7 +188,16 @@ public class ChatInputController : Object {
                     break;
             }
         }
-        stream_interactor.get_module(MessageProcessor.IDENTITY).send_text(text, conversation);
+        Message out_message = stream_interactor.get_module(MessageProcessor.IDENTITY).create_out_message(text, conversation);
+        if (quoted_content_item != null) {
+            stream_interactor.get_module(Replies.IDENTITY).set_message_is_reply_to(out_message, quoted_content_item);
+        }
+        stream_interactor.get_module(MessageProcessor.IDENTITY).send_message(out_message, conversation);
+
+        // Reset input state
+        chat_input.chat_text_view.text_view.buffer.text = "";
+        chat_input.unset_quoted_message();
+        quoted_content_item = null;
     }
 
     private void on_text_input_changed() {
@@ -184,12 +222,12 @@ public class ChatInputController : Object {
         }
     }
 
-    private bool on_text_input_key_press(EventKey event) {
-        if (event.keyval == Gdk.Key.Up && chat_input.chat_text_view.text_view.buffer.text == "") {
+    private bool on_text_input_key_press(uint keyval, uint keycode, Gdk.ModifierType state) {
+        if (keyval == Gdk.Key.Up && chat_input.chat_text_view.text_view.buffer.text == "") {
             activate_last_message_correction();
             return true;
         } else {
-            chat_input.chat_text_view.text_view.grab_focus();
+            chat_input.do_focus();
         }
         return false;
     }

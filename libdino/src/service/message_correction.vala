@@ -44,6 +44,7 @@ public class MessageCorrection : StreamInteractionModule, MessageListener {
 
         Message out_message = stream_interactor.get_module(MessageProcessor.IDENTITY).create_out_message(correction_text, conversation);
         out_message.edit_to = stanza_id;
+        out_message.quoted_item_id = old_message.quoted_item_id;
         outstanding_correction_nodes[out_message.stanza_id] = stanza_id;
         stream_interactor.get_module(MessageProcessor.IDENTITY).send_xmpp_message(out_message, conversation);
 
@@ -96,9 +97,10 @@ public class MessageCorrection : StreamInteractionModule, MessageListener {
 
     public override async bool run(Entities.Message message, Xmpp.MessageStanza stanza, Conversation conversation) {
         if (conversation.type_ != Conversation.Type.CHAT) {
-            // Don't process messages or corrections from MUC history
+            // Don't process messages or corrections from MUC history or MUC MAM
             DateTime? mam_delay = Xep.DelayedDelivery.get_time_for_message(stanza, message.from.bare_jid);
             if (mam_delay != null) return false;
+            if (Xmpp.MessageArchiveManagement.MessageFlag.get_flag(stanza) != null) return false;
         }
 
         string? replace_id = Xep.LastMessageCorrection.get_replace_id(stanza);
@@ -144,7 +146,7 @@ public class MessageCorrection : StreamInteractionModule, MessageListener {
     }
 
     private void on_received_correction(Conversation conversation, int message_id) {
-        ContentItem? content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_item(conversation, 1, message_id);
+        ContentItem? content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_item_by_foreign(conversation, 1, message_id);
         if (content_item != null) {
             received_correction(content_item);
         }

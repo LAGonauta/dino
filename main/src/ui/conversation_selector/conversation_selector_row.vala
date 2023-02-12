@@ -21,7 +21,8 @@ public class ConversationSelectorRow : ListBoxRow {
     [GtkChild] protected unowned Button x_button;
     [GtkChild] protected unowned Revealer time_revealer;
     [GtkChild] protected unowned Revealer xbutton_revealer;
-    [GtkChild] protected unowned Revealer unread_count_revealer;
+    [GtkChild] protected unowned Revealer top_row_revealer;
+    [GtkChild] protected unowned Image pinned_image;
     [GtkChild] public unowned Revealer main_revealer;
 
     public Conversation conversation { get; private set; }
@@ -70,15 +71,15 @@ public class ConversationSelectorRow : ListBoxRow {
         // Set tooltip
         switch (conversation.type_) {
             case Conversation.Type.CHAT:
-                has_tooltip = true;
+                has_tooltip = Util.use_tooltips();
                 query_tooltip.connect ((x, y, keyboard_tooltip, tooltip) => {
-                    tooltip.set_custom(generate_tooltip());
+                    tooltip.set_custom(Util.widget_if_tooltips_active(generate_tooltip()));
                     return true;
                 });
                 break;
             case Conversation.Type.GROUPCHAT:
-                has_tooltip = true;
-                set_tooltip_text(conversation.counterpart.bare_jid.to_string());
+                has_tooltip = Util.use_tooltips();
+                set_tooltip_text(Util.string_if_tooltips_active(conversation.counterpart.bare_jid.to_string()));
                 break;
             case Conversation.Type.GROUPCHAT_PM:
                 break;
@@ -102,8 +103,10 @@ public class ConversationSelectorRow : ListBoxRow {
         });
         image.set_conversation(stream_interactor, conversation);
         conversation.notify["read-up-to-item"].connect(() => update_read());
+        conversation.notify["pinned"].connect(() => { update_pinned_icon(); });
 
         update_name_label();
+        update_pinned_icon();
         content_item_received();
     }
 
@@ -135,6 +138,10 @@ public class ConversationSelectorRow : ListBoxRow {
         name_label.label = Util.get_conversation_display_name(stream_interactor, conversation);
     }
 
+    private void update_pinned_icon() {
+        pinned_image.visible = conversation.pinned != 0;
+    }
+
     protected void update_time_label(DateTime? new_time = null) {
         if (last_content_item != null) {
             time_label.visible = true;
@@ -149,7 +156,7 @@ public class ConversationSelectorRow : ListBoxRow {
                     MessageItem message_item = last_content_item as MessageItem;
                     Message last_message = message_item.message;
 
-                    string body = last_message.body;
+                    string body = Dino.message_body_without_reply_fallback(last_message);
                     bool me_command = body.has_prefix("/me ");
 
                     /* If we have a /me command, we always show the display
@@ -175,7 +182,7 @@ public class ConversationSelectorRow : ListBoxRow {
                         nick_label.label += ": ";
                     }
 
-                    message_label.attributes.filter((attr) => attr.equal(attr_style_new(Pango.Style.ITALIC)));
+                    change_label_attribute(message_label, attr_style_new(Pango.Style.NORMAL));
                     message_label.label = Util.summarize_whitespaces_to_space(body);
 
                     break;
@@ -191,7 +198,7 @@ public class ConversationSelectorRow : ListBoxRow {
                     }
 
                     bool file_is_image = transfer.mime_type != null && transfer.mime_type.has_prefix("image");
-                    message_label.attributes.insert(attr_style_new(Pango.Style.ITALIC));
+                    change_label_attribute(message_label, attr_style_new(Pango.Style.ITALIC));
                     if (transfer.direction == Message.DIRECTION_SENT) {
                         message_label.label = (file_is_image ? _("Image sent") : _("File sent") );
                     } else {
@@ -203,13 +210,19 @@ public class ConversationSelectorRow : ListBoxRow {
                     Call call = call_item.call;
 
                     nick_label.label = call.direction == Call.DIRECTION_OUTGOING ? _("Me") + ": " : "";
-                    message_label.attributes.insert(attr_style_new(Pango.Style.ITALIC));
+                    change_label_attribute(message_label, attr_style_new(Pango.Style.ITALIC));
                     message_label.label = call.direction == Call.DIRECTION_OUTGOING ? _("Outgoing call") : _("Incoming call");
                     break;
             }
             nick_label.visible = true;
             message_label.visible = true;
         }
+    }
+
+    private static void change_label_attribute(Label label, owned Attribute attribute) {
+        AttrList copy = label.attributes.copy();
+        copy.change((owned) attribute);
+        label.attributes = copy;
     }
 
     protected void update_read(bool force_update = false) {
@@ -220,43 +233,38 @@ public class ConversationSelectorRow : ListBoxRow {
         if (num_unread == 0) {
             unread_count_label.visible = false;
 
-            name_label.attributes.filter((attr) => attr.equal(attr_weight_new(Weight.BOLD)));
-            time_label.attributes.filter((attr) => attr.equal(attr_weight_new(Weight.BOLD)));
-            nick_label.attributes.filter((attr) => attr.equal(attr_weight_new(Weight.BOLD)));
-            message_label.attributes.filter((attr) => attr.equal(attr_weight_new(Weight.BOLD)));
+            change_label_attribute(name_label, attr_weight_new(Weight.NORMAL));
+            change_label_attribute(time_label, attr_weight_new(Weight.NORMAL));
+            change_label_attribute(nick_label, attr_weight_new(Weight.NORMAL));
+            change_label_attribute(message_label, attr_weight_new(Weight.NORMAL));
         } else {
             unread_count_label.label = num_unread.to_string();
             unread_count_label.visible = true;
 
             if (conversation.get_notification_setting(stream_interactor) == Conversation.NotifySetting.ON) {
-                unread_count_label.get_style_context().add_class("unread-count-notify");
-                unread_count_label.get_style_context().remove_class("unread-count");
+                unread_count_label.add_css_class("unread-count-notify");
+                unread_count_label.remove_css_class("unread-count");
             } else {
-                unread_count_label.get_style_context().add_class("unread-count");
-                unread_count_label.get_style_context().remove_class("unread-count-notify");
+                unread_count_label.add_css_class("unread-count");
+                unread_count_label.remove_css_class("unread-count-notify");
             }
 
-            name_label.attributes.insert(attr_weight_new(Weight.BOLD));
-            time_label.attributes.insert(attr_weight_new(Weight.BOLD));
-            nick_label.attributes.insert(attr_weight_new(Weight.BOLD));
-            message_label.attributes.insert(attr_weight_new(Weight.BOLD));
+            change_label_attribute(name_label, attr_weight_new(Weight.BOLD));
+            change_label_attribute(time_label, attr_weight_new(Weight.BOLD));
+            change_label_attribute(nick_label, attr_weight_new(Weight.BOLD));
+            change_label_attribute(message_label, attr_weight_new(Weight.BOLD));
         }
-
-        name_label.label = name_label.label; // TODO initializes redrawing, which would otherwise not happen. nicer?
-        time_label.label = time_label.label;
-        nick_label.label = nick_label.label;
-        message_label.label = message_label.label;
     }
 
     public override void state_flags_changed(StateFlags flags) {
         StateFlags curr_flags = get_state_flags();
         if ((curr_flags & StateFlags.PRELIGHT) != 0) {
             time_revealer.set_reveal_child(false);
-            unread_count_revealer.set_reveal_child(false);
+            top_row_revealer.set_reveal_child(false);
             xbutton_revealer.set_reveal_child(true);
         } else {
             time_revealer.set_reveal_child(true);
-            unread_count_revealer.set_reveal_child(true);
+            top_row_revealer.set_reveal_child(true);
             xbutton_revealer.set_reveal_child(false);
         }
     }
@@ -264,9 +272,9 @@ public class ConversationSelectorRow : ListBoxRow {
     private static Regex dino_resource_regex = /^dino\.[a-f0-9]{8}$/;
 
     private Widget generate_tooltip() {
-        Grid grid = new Grid() { row_spacing=5, column_homogeneous=false, column_spacing=2, margin_start=5, margin_end=5, margin_top=2, margin_bottom=2, visible=true };
+        Grid grid = new Grid() { row_spacing=5, column_homogeneous=false, column_spacing=5, margin_start=7, margin_end=7, margin_top=7, margin_bottom=7 };
 
-        Label label = new Label(conversation.counterpart.to_string()) { valign=Align.START, xalign=0, visible=true };
+        Label label = new Label(conversation.counterpart.to_string()) { valign=Align.START, xalign=0 };
         label.attributes = new AttrList();
         label.attributes.insert(attr_weight_new(Weight.BOLD));
 
@@ -284,11 +292,11 @@ public class ConversationSelectorRow : ListBoxRow {
             stream_interactor.get_module(EntityInfo.IDENTITY).get_identity.begin(conversation.account, full_jid, (_, res) => {
                 Xep.ServiceDiscovery.Identity? identity = stream_interactor.get_module(EntityInfo.IDENTITY).get_identity.end(res);
 
-                Image image = new Image() { hexpand=false, valign=Align.CENTER, visible=true };
+                Image image = new Image() { hexpand=false, valign=Align.CENTER };
                 if (identity != null && (identity.type_ == Xep.ServiceDiscovery.Identity.TYPE_PHONE || identity.type_ == Xep.ServiceDiscovery.Identity.TYPE_TABLET)) {
-                    image.set_from_icon_name("dino-device-phone-symbolic", IconSize.SMALL_TOOLBAR);
+                    image.set_from_icon_name("dino-device-phone-symbolic");
                 } else {
-                    image.set_from_icon_name("dino-device-desktop-symbolic", IconSize.SMALL_TOOLBAR);
+                    image.set_from_icon_name("dino-device-desktop-symbolic");
                 }
 
                 if (show == Presence.Stanza.SHOW_AWAY) {
@@ -322,7 +330,7 @@ public class ConversationSelectorRow : ListBoxRow {
                     sb.append(" <i>(").append(status).append(")</i>");
                 }
 
-                Label resource = new Label(sb.str) { use_markup=true, hexpand=true, xalign=0, visible=true };
+                Label resource = new Label(sb.str) { use_markup=true, hexpand=true, xalign=0 };
 
                 grid.attach(image, 0, i_cache + 1, 1, 1);
                 grid.attach(resource, 1, i_cache + 1, 1, 1);

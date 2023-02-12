@@ -17,7 +17,7 @@ public class SettingsProvider : Plugins.ContactDetailsProvider, Object {
     }
 
     public void populate(Conversation conversation, Plugins.ContactDetails contact_details, Plugins.WidgetType type) {
-        if (type != Plugins.WidgetType.GTK) return;
+        if (type != Plugins.WidgetType.GTK4) return;
 
         if (!stream_interactor.get<MucManager>().is_public_room(conversation.account, conversation.counterpart)) {
             string details_headline = conversation.type_ == Conversation.Type.GROUPCHAT ? DETAILS_HEADLINE_ROOM : DETAILS_HEADLINE_CHAT;
@@ -39,7 +39,7 @@ public class SettingsProvider : Plugins.ContactDetailsProvider, Object {
             combobox_notifications.active_id = get_notify_setting_id(conversation.notify_setting);
             combobox_notifications.changed.connect(() => { conversation.notify_setting = get_notify_setting(combobox_notifications.active_id); } );
         } else if (conversation.type_ == Conversation.Type.GROUPCHAT) {
-            ComboBoxText combobox = new ComboBoxText() { visible=true };
+            ComboBoxText combobox = new ComboBoxText();
             combobox.append("default", get_notify_setting_string(Conversation.NotifySetting.DEFAULT, conversation.get_notification_default_setting(stream_interactor)));
             combobox.append("highlight", get_notify_setting_string(Conversation.NotifySetting.HIGHLIGHT));
             combobox.append("on", get_notify_setting_string(Conversation.NotifySetting.ON));
@@ -49,6 +49,12 @@ public class SettingsProvider : Plugins.ContactDetailsProvider, Object {
             combobox.active_id = get_notify_setting_id(conversation.notify_setting);
             combobox.changed.connect(() => { conversation.notify_setting = get_notify_setting(combobox.active_id); } );
         }
+
+        Switch pinned_switch = new Switch() { valign=Align.CENTER };
+        string category = conversation.type_ == Conversation.Type.GROUPCHAT ? DETAILS_HEADLINE_ROOM : DETAILS_HEADLINE_CHAT;
+        contact_details.add(category, _("Pin conversation"), _("Pins the conversation to the top of the conversation list"), pinned_switch);
+        pinned_switch.state = conversation.pinned != 0;
+        pinned_switch.state_set.connect((state) => { conversation.pinned = state ? 1 : 0; return false; });
     }
 
     private Conversation.Setting get_setting(string id) {
@@ -119,7 +125,7 @@ public class SettingsProvider : Plugins.ContactDetailsProvider, Object {
 
     private ComboBoxText get_combobox(bool default_val) {
         ComboBoxText combobox = new ComboBoxText();
-        combobox = new ComboBoxText() { visible=true };
+        combobox = new ComboBoxText();
         string default_setting = default_val ? _("On") : _("Off");
         combobox.append("default", _("Default: %s").printf(default_setting) );
         combobox.append("on", _("On"));

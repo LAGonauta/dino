@@ -55,15 +55,15 @@ public interface Application : GLib.Application {
         EntityInfo.start(stream_interactor, db);
         MessageCorrection.start(stream_interactor, db);
         FileTransferStorage.start(stream_interactor, db);
+        Reactions.start(stream_interactor, db);
+        Replies.start(stream_interactor, db);
+        FallbackBody.start(stream_interactor, db);
 
         create_actions();
 
         startup.connect(() => {
             stream_interactor.connection_manager.log_options = print_xmpp;
-            Idle.add(() => {
-                restore();
-                return false;
-            });
+            restore();
         });
         shutdown.connect(() => {
             stream_interactor.connection_manager.make_offline_all();

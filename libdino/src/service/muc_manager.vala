@@ -23,11 +23,13 @@ public class MucManager : StreamInteractionModule, Object {
     private StreamInteractor stream_interactor;
     private HashMap<Account, HashSet<Jid>> mucs_todo = new HashMap<Account, HashSet<Jid>>(Account.hash_func, Account.equals_func);
     private HashMap<Account, HashSet<Jid>> mucs_joining = new HashMap<Account, HashSet<Jid>>(Account.hash_func, Account.equals_func);
+    private HashMap<Account, HashMap<Jid, Cancellable>> mucs_sync_cancellables = new HashMap<Account, HashMap<Jid, Cancellable>>(Account.hash_func, Account.equals_func);
     private HashMap<Jid, Xep.Muc.MucEnterError> enter_errors = new HashMap<Jid, Xep.Muc.MucEnterError>(Jid.hash_func, Jid.equals_func);
     private ReceivedMessageListener received_message_listener;
     private HashMap<Account, BookmarksProvider> bookmarks_provider = new HashMap<Account, BookmarksProvider>(Account.hash_func, Account.equals_func);
     private HashMap<Account, Gee.List<Jid>> invites = new HashMap<Account, Gee.List<Jid>>(Account.hash_func, Account.equals_func);
     public HashMap<Account, Jid> default_muc_server = new HashMap<Account, Jid>(Account.hash_func, Account.equals_func);
+    private HashMap<Account, HashMap<Jid, string>> own_occupant_ids = new HashMap<Account, HashMap<Jid, string>>(Account.hash_func, Account.equals_func);
 
     public static void start(StreamInteractor stream_interactor) {
         MucManager m = new MucManager(stream_interactor);
@@ -55,7 +57,7 @@ public class MucManager : StreamInteractionModule, Object {
     }
 
     // already_autojoin: Without this flag we'd be retrieving bookmarks (to check for autojoin) from the sender on every join
-    public async Muc.JoinResult? join(Account account, Jid jid, string? nick, string? password, bool already_autojoin = false) {
+    public async Muc.JoinResult? join(Account account, Jid jid, string? nick, string? password, bool already_autojoin = false, Cancellable? cancellable = null) {
         XmppStream? stream = stream_interactor.get_stream(account);
         if (stream == null) return null;
 
@@ -68,6 +70,14 @@ public class MucManager : StreamInteractionModule, Object {
             if (last_message != null) history_since = last_message.time;
         }
 
+        bool receive_history = true;
+        EntityInfo entity_info = stream_interactor.get_module(EntityInfo.IDENTITY);
+        bool can_do_mam = yield entity_info.has_feature(account, jid, Xmpp.MessageArchiveManagement.NS_URI_2);
+        if (can_do_mam) {
+            receive_history = false;
+            history_since = null;
+        }
+
         if (!mucs_joining.has_key(account)) {
             mucs_joining[account] = new HashSet<Jid>(Jid.hash_bare_func, Jid.equals_bare_func);
         }
@@ -78,7 +88,7 @@ public class MucManager : StreamInteractionModule, Object {
         }
         mucs_todo[account].add(jid.with_resource(nick_));
 
-        Muc.JoinResult? res = yield stream.get_module(Xep.Muc.Module.IDENTITY).enter(stream, jid.bare_jid, nick_, password, history_since, null);
+        Muc.JoinResult? res = yield stream.get_module(Xep.Muc.Module.IDENTITY).enter(stream, jid.bare_jid, nick_, password, history_since, receive_history, null);
 
         mucs_joining[account].remove(jid);
 
@@ -91,6 +101,26 @@ public class MucManager : StreamInteractionModule, Object {
             Conversation joined_conversation = stream_interactor.get_module(ConversationManager.IDENTITY).create_conversation(jid, account, Conversation.Type.GROUPCHAT);
             joined_conversation.nickname = nick;
             stream_interactor.get_module(ConversationManager.IDENTITY).start_conversation(joined_conversation);
+
+            if (can_do_mam) {
+                var history_sync = stream_interactor.get_module(MessageProcessor.IDENTITY).history_sync;
+                if (conversation == null) {
+                    // We never joined the conversation before, just fetch the latest MAM page
+                    yield history_sync.fetch_latest_page(account, jid.bare_jid, null, new DateTime.from_unix_utc(0), cancellable);
+                } else {
+                    // Fetch everything up to the last time the user actively joined
+                    if (!mucs_sync_cancellables.has_key(account)) {
+                        mucs_sync_cancellables[account] = new HashMap<Jid, Cancellable>();
+                    }
+                    if (!mucs_sync_cancellables[account].has_key(jid.bare_jid)) {
+                        mucs_sync_cancellables[account][jid.bare_jid] = new Cancellable();
+                        history_sync.fetch_everything.begin(account, jid.bare_jid, mucs_sync_cancellables[account][jid.bare_jid], conversation.active_last_changed, (_, res) => {
+                            history_sync.fetch_everything.end(res);
+                            mucs_sync_cancellables[account].unset(jid.bare_jid);
+                        });
+                    }
+                }
+            }
         } else if (res.muc_error != null) {
             // Join failed
             enter_errors[jid] = res.muc_error;
@@ -111,6 +141,14 @@ public class MucManager : StreamInteractionModule, Object {
 
         Conversation? conversation = stream_interactor.get_module(ConversationManager.IDENTITY).get_conversation(jid, account);
         if (conversation != null) stream_interactor.get_module(ConversationManager.IDENTITY).close_conversation(conversation);
+
+        cancel_sync(account, jid);
+    }
+
+    private void cancel_sync(Account account, Jid jid) {
+        if (mucs_sync_cancellables.has_key(account) && mucs_sync_cancellables[account].has_key(jid.bare_jid) && !mucs_sync_cancellables[account][jid.bare_jid].is_cancelled()) {
+            mucs_sync_cancellables[account][jid.bare_jid].cancel();
+        }
     }
 
     public async DataForms.DataForm? get_config_form(Account account, Jid jid) {
@@ -302,6 +340,14 @@ public class MucManager : StreamInteractionModule, Object {
         return null;
     }
 
+    public Jid? get_occupant_jid(Account account, Jid room, Jid occupant_real_jid) {
+        Xep.Muc.Flag? flag = get_muc_flag(account);
+        if (flag != null) {
+            return flag.get_occupant_jid(occupant_real_jid, room);
+        }
+        return null;
+    }
+
     public Xep.Muc.Role? get_role(Jid jid, Account account) {
         Xep.Muc.Flag? flag = get_muc_flag(account);
         if (flag != null) {
@@ -365,8 +411,16 @@ public class MucManager : StreamInteractionModule, Object {
         return get_own_jid(jid, account) != null;
     }
 
+    public string? get_own_occupant_id(Account account, Jid muc_jid) {
+        if (own_occupant_ids.has_key(account) && own_occupant_ids[account].has_key(muc_jid)) {
+            return own_occupant_ids[account][muc_jid];
+        }
+        return null;
+    }
+
     private void on_account_added(Account account) {
         stream_interactor.module_manager.get_module(account, Xep.Muc.Module.IDENTITY).self_removed_from_room.connect( (stream, jid, code) => {
+            cancel_sync(account, jid);
             left(account, jid);
         });
         stream_interactor.module_manager.get_module(account, Xep.Muc.Module.IDENTITY).subject_set.connect( (stream, subject, jid) => {
@@ -391,6 +445,12 @@ public class MucManager : StreamInteractionModule, Object {
             if (is_private_room(account, room.bare_jid)) {
                 private_room_occupant_updated(account, room, occupant);
             }
+        });
+        stream_interactor.module_manager.get_module(account, Xep.OccupantIds.Module.IDENTITY).received_own_occupant_id.connect( (stream, jid, occupant_id) => {
+            if (!own_occupant_ids.has_key(account)) {
+                own_occupant_ids[account] = new HashMap<Jid, string>(Jid.hash_bare_func, Jid.equals_bare_func);
+            }
+            own_occupant_ids[account][jid] = occupant_id;
         });
     }
 
@@ -425,6 +485,14 @@ public class MucManager : StreamInteractionModule, Object {
     }
 
     private async void on_stream_negotiated(Account account, XmppStream stream) {
+        if (mucs_sync_cancellables.has_key(account)) {
+            foreach (Cancellable cancellable in mucs_sync_cancellables[account].values) {
+                if (!cancellable.is_cancelled()) {
+                    cancellable.cancel();
+                }
+            }
+        }
+
         yield initialize_bookmarks_provider(account);
 
         Set<Conference>? conferences = yield bookmarks_provider[account].get_conferences(stream);
@@ -634,6 +702,10 @@ public class MucManager : StreamInteractionModule, Object {
                 if (m != null) {
                     // For own messages from this device (msg is a duplicate)
                     m.marked = Message.Marked.RECEIVED;
+                    string? server_id = Xep.UniqueStableStanzaIDs.get_stanza_id(stanza, m.counterpart.bare_jid);
+                    if (server_id != null) {
+                        m.server_id = server_id;
+                    }
                 }
                 // For own messages from other devices (msg is not a duplicate msg)
                 message.marked = Message.Marked.RECEIVED;

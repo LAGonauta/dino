@@ -40,8 +40,10 @@ SOURCES
     src/service/database.vala
     src/service/entity_capabilities_storage.vala
     src/service/entity_info.vala
+    src/service/fallback_body.vala
     src/service/file_manager.vala
     src/service/file_transfer_storage.vala
+    src/service/history_sync.vala
     src/service/jingle_file_transfers.vala
     src/service/message_correction.vala
     src/service/message_processor.vala
@@ -50,6 +52,8 @@ SOURCES
     src/service/muc_manager.vala
     src/service/notification_events.vala
     src/service/presence_manager.vala
+    src/service/replies.vala
+    src/service/reactions.vala
     src/service/registration.vala
     src/service/roster_manager.vala
     src/service/search_processor.vala
