@@ -3,7 +3,7 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-gcc \
        mingw64/mingw-w64-x86_64-cmake \
        mingw64/mingw-w64-x86_64-ninja \
-       mingw64/mingw-w64-x86_64-libsoup \
+       mingw64/mingw-w64-x86_64-libsoup3 \
        mingw64/mingw-w64-x86_64-gtk4 \
        mingw64/mingw-w64-x86_64-sqlite3 \
        mingw64/mingw-w64-x86_64-gobject-introspection \
@@ -23,9 +23,9 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-enchant \
        mingw64/mingw-w64-x86_64-hunspell \
        mingw64/mingw-w64-x86_64-iso-codes \
-       mingw64/mingw-w64-x86_64-gst-plugins-bad \
-       mingw64/mingw-w64-x86_64-gst-plugins-good \
        mingw64/mingw-w64-x86_64-gst-plugins-base \
+       mingw64/mingw-w64-x86_64-gst-plugins-good \
+       mingw64/mingw-w64-x86_64-gst-plugins-bad \
        mingw64/mingw-w64-x86_64-gst-plugins-ugly \
        make \
        zip \
