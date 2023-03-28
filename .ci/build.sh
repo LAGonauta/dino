@@ -1,5 +1,5 @@
 #!/bin/bash
-./configure --with-libsignal-in-tree --program-prefix=${PWD}/dist --no-debug --release --disable-fast-vapi && \
+./configure --with-libsignal-in-tree --program-prefix=${PWD}/dist --no-debug --release --disable-fast-vapi --with-libsoup3 && \
     make -j$NUMBER_OF_PROCESSORS && \
     make install && \
     cd dist && \

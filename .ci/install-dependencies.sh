@@ -3,7 +3,7 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-gcc \
        mingw64/mingw-w64-x86_64-cmake \
        mingw64/mingw-w64-x86_64-ninja \
-       mingw64/mingw-w64-x86_64-libsoup \
+       mingw64/mingw-w64-x86_64-libsoup3 \
        mingw64/mingw-w64-x86_64-gtk3 \
        mingw64/mingw-w64-x86_64-sqlite3 \
        mingw64/mingw-w64-x86_64-gobject-introspection \

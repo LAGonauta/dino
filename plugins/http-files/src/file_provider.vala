@@ -10,13 +10,16 @@ public class FileProvider : Dino.FileProvider, Object {
 
     private StreamInteractor stream_interactor;
     private Dino.Database dino_db;
+    private Soup.Session session;
     private static Regex http_url_regex = /^https?:\/\/([^\s#]*)$/; // Spaces are invalid in URLs and we can't use fragments for downloads
     private static Regex omemo_url_regex = /^aesgcm:\/\/(.*)#(([A-Fa-f0-9]{2}){48}|([A-Fa-f0-9]{2}){44})$/;
 
     public FileProvider(StreamInteractor stream_interactor, Dino.Database dino_db) {
         this.stream_interactor = stream_interactor;
         this.dino_db = dino_db;
+        this.session = new Soup.Session();
 
+        session.user_agent = @"Dino/$(Dino.get_short_version()) ";
         stream_interactor.get_module(MessageProcessor.IDENTITY).received_pipeline.connect(new ReceivedMessageListener(this));
     }
 
@@ -46,13 +49,27 @@ public class FileProvider : Dino.FileProvider, Object {
         }
     }
 
-    private class LimitInputStream : InputStream {
+    private class LimitInputStream : InputStream, PollableInputStream {
         InputStream inner;
         int64 remaining_size;
 
         public LimitInputStream(InputStream inner, int64 max_size) {
             this.inner = inner;
             this.remaining_size = max_size;
+        }
+
+        public bool can_poll() {
+            return inner is PollableInputStream && ((PollableInputStream)inner).can_poll();
+        }
+
+        public PollableSource create_source(Cancellable? cancellable = null) {
+            if (!can_poll()) throw new IOError.NOT_SUPPORTED("Stream is not pollable");
+            return ((PollableInputStream)inner).create_source(cancellable);
+        }
+
+        public bool is_readable() {
+            if (!can_poll()) throw new IOError.NOT_SUPPORTED("Stream is not pollable");
+            return remaining_size <= 0 || ((PollableInputStream)inner).is_readable();
         }
 
         private ssize_t check_limit(ssize_t read) throws IOError {
@@ -67,6 +84,11 @@ public class FileProvider : Dino.FileProvider, Object {
 
         public override async ssize_t read_async(uint8[]? buffer, int io_priority = GLib.Priority.DEFAULT, Cancellable? cancellable = null) throws IOError {
             return check_limit(yield inner.read_async(buffer, io_priority, cancellable));
+        }
+
+        public ssize_t read_nonblocking_fn(uint8[] buffer) throws Error {
+            if (!is_readable()) throw new IOError.WOULD_BLOCK("Stream is not readable");
+            return read(buffer);
         }
 
         public override bool close(Cancellable? cancellable = null) throws IOError {
@@ -95,13 +117,11 @@ public class FileProvider : Dino.FileProvider, Object {
         HttpFileReceiveData? http_receive_data = receive_data as HttpFileReceiveData;
         if (http_receive_data == null) return file_meta;
 
-        var session = new Soup.Session();
-        session.user_agent = @"Dino/$(Dino.get_short_version()) ";
         var head_message = new Soup.Message("HEAD", http_receive_data.url);
         head_message.request_headers.append("Accept-Encoding", "identity");
 
         try {
-#if SOUP_3
+#if SOUP_3_0
             yield session.send_async(head_message, GLib.Priority.LOW, null);
 #else
             yield session.send_async(head_message, null);
@@ -131,12 +151,10 @@ public class FileProvider : Dino.FileProvider, Object {
         HttpFileReceiveData? http_receive_data = receive_data as HttpFileReceiveData;
         if (http_receive_data == null) assert(false);
 
-        var session = new Soup.Session();
-        session.user_agent = @"Dino/$(Dino.get_short_version()) ";
         var get_message = new Soup.Message("GET", http_receive_data.url);
 
         try {
-#if SOUP_3
+#if SOUP_3_0
             InputStream stream = yield session.send_async(get_message, GLib.Priority.LOW, file_transfer.cancellable);
 #else
             InputStream stream = yield session.send_async(get_message, file_transfer.cancellable);

@@ -7,12 +7,15 @@ namespace Dino.Plugins.HttpFiles {
 public class HttpFileSender : FileSender, Object {
     private StreamInteractor stream_interactor;
     private Database db;
+    private Soup.Session session;
     private HashMap<Account, long> max_file_sizes = new HashMap<Account, long>(Account.hash_func, Account.equals_func);
 
     public HttpFileSender(StreamInteractor stream_interactor, Database db) {
         this.stream_interactor = stream_interactor;
         this.db = db;
+        this.session = new Soup.Session();
 
+        session.user_agent = @"Dino/$(Dino.get_short_version()) ";
         stream_interactor.stream_negotiated.connect(on_stream_negotiated);
         stream_interactor.get_module(MessageProcessor.IDENTITY).build_message_stanza.connect(check_add_oob);
     }
@@ -73,7 +76,7 @@ public class HttpFileSender : FileSender, Object {
         }
     }
 
-#if !SOUP_3
+#if !SOUP_3_0
     private static void transfer_more_bytes(InputStream stream, Soup.MessageBody body) {
         uint8[] bytes = new uint8[4096];
         ssize_t read = stream.read(bytes);
@@ -90,10 +93,8 @@ public class HttpFileSender : FileSender, Object {
         Xmpp.XmppStream? stream = stream_interactor.get_stream(file_transfer.account);
         if (stream == null) return;
 
-        var session = new Soup.Session();
-        session.user_agent = @"Dino/$(Dino.get_short_version()) ";
         var put_message = new Soup.Message("PUT", file_send_data.url_up);
-#if SOUP_3
+#if SOUP_3_0
         put_message.set_request_body(file_meta.mime_type, file_transfer.input_stream, (ssize_t) file_meta.size);
 #else
         put_message.request_headers.set_content_type(file_meta.mime_type, null);
@@ -106,7 +107,7 @@ public class HttpFileSender : FileSender, Object {
             put_message.request_headers.append(entry.key, entry.value);
         }
         try {
-#if SOUP_3
+#if SOUP_3_0
             yield session.send_async(put_message, GLib.Priority.LOW, file_transfer.cancellable);
 #else
             yield session.send_async(put_message, file_transfer.cancellable);
