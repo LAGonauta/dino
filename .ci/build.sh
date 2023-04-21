@@ -8,6 +8,7 @@
     cp -r /mingw64/share/xml ./share && \
     cp -r /mingw64/lib/enchant-2 ./lib && \
     cp -r /mingw64/lib/gstreamer-1.0 ./lib && \
+    mkdir -p ./etc/fonts && cp -r /mingw64/etc/fonts ./etc/ && \
     mkdir ./share/hunspell && \
     curl -L -o ./share/hunspell/pt_BR.aff https://github.com/elastic/hunspell/raw/master/dicts/pt_BR/pt_BR.aff && \
     curl -L -o ./share/hunspell/pt_BR.dic https://github.com/elastic/hunspell/raw/master/dicts/pt_BR/pt_BR.dic && \

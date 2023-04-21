@@ -18,7 +18,7 @@ pacman -S --needed --noconfirm \
        mingw64/mingw-w64-x86_64-ntldd-git \
        mingw64/mingw-w64-x86_64-gpgme \
        mingw64/mingw-w64-x86_64-nsis \
-       mingw64/mingw-w64-x86_64-libhandy \
+       mingw64/mingw-w64-x86_64-fontconfig \
        mingw64/mingw-w64-x86_64-gspell \
        mingw64/mingw-w64-x86_64-enchant \
        mingw64/mingw-w64-x86_64-hunspell \
