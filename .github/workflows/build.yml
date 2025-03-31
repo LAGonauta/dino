@@ -115,7 +115,6 @@ jobs:
         run: meson compile -C build
       - name: "Build Package"
         run: |
-          tree ./build
           mkdir dist && \
             cd dist && \
             mkdir ./bin ./etc ./lib ./share && \
