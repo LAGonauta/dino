@@ -1,7 +1,12 @@
 #!/bin/sh
 
+echo "Warning in ./configure:"
+echo "  Using CMake, ./configure or make to build Dino is deprecated and will be"
+echo "  removed before the 0.5 release.  Use Meson instead."
+echo ""
+
 OPTS=`getopt -o "h" --long \
-help,fetch-only,no-debug,disable-fast-vapi,with-tests,release,with-libsignal-in-tree,with-libsoup3,\
+help,fetch-only,no-debug,disable-fast-vapi,with-tests,release,with-libsoup3,\
 enable-plugin:,disable-plugin:,\
 prefix:,program-prefix:,exec-prefix:,lib-suffix:,\
 bindir:,libdir:,includedir:,datadir:,\
@@ -15,13 +20,11 @@ eval set -- "$OPTS"
 PREFIX=${PREFIX:-/usr/local}
 ENABLED_PLUGINS=
 DISABLED_PLUGINS=
-BUILD_LIBSIGNAL_IN_TREE=
 BUILD_TESTS=
 BUILD_TYPE=Debug
 DISABLE_FAST_VAPI=
 LIB_SUFFIX=
 NO_DEBUG=
-FETCH_ONLY=
 USE_SOUP3=
 
 EXEC_PREFIX=
@@ -55,8 +58,6 @@ Configuration:
                              without network access later and exit.
   --no-debug                 Build without debug symbols
   --release                  Configure to build an optimized release version
-  --with-libsignal-in-tree   Build libsignal-protocol-c in tree and link it
-                             statically.
   --with-libsoup3            Build with libsoup-3.0
   --with-tests               Also build tests.
 
@@ -110,13 +111,11 @@ while true; do
         --enable-plugin ) if [ -z "$ENABLED_PLUGINS" ]; then ENABLED_PLUGINS="$2"; else ENABLED_PLUGINS="$ENABLED_PLUGINS;$2"; fi; shift; shift ;;
         --disable-plugin ) if [ -z "$DISABLED_PLUGINS" ]; then DISABLED_PLUGINS="$2"; else DISABLED_PLUGINS="$DISABLED_PLUGINS;$2"; fi; shift; shift ;;
         --valac ) VALA_EXECUTABLE="$2"; shift; shift ;;
-        --valac-flags ) VALAC_FLAGS="$2"; shift; shift ;;
+        --valac-flags ) VALACFLAGS="$2"; shift; shift ;;
         --lib-suffix ) LIB_SUFFIX="$2"; shift; shift ;;
-        --with-libsignal-in-tree ) BUILD_LIBSIGNAL_IN_TREE=yes; shift ;;
         --with-libsoup3 ) USE_SOUP3=yes; shift ;;
         --disable-fast-vapi ) DISABLE_FAST_VAPI=yes; shift ;;
         --no-debug ) NO_DEBUG=yes; shift ;;
-        --fetch-only ) FETCH_ONLY=yes; shift ;;
         --release ) BUILD_TYPE=RelWithDebInfo; shift ;;
         --with-tests ) BUILD_TESTS=yes; shift ;;
         # Autotools paths
@@ -140,50 +139,6 @@ while true; do
         * ) break ;;
     esac
 done
-
-if [ "$BUILD_LIBSIGNAL_IN_TREE" = "yes" ] || [ "$FETCH_ONLY" = "yes" ]; then
-    if [ -d ".git" ]; then
-        git submodule update --init 2>/dev/null
-    else
-        tmp=0
-        for i in $(cat .gitmodules | grep -n submodule | awk -F ':' '{print $1}') $(wc -l .gitmodules | awk '{print $1}'); do
-            if ! [ $tmp -eq 0 ]; then
-                name=$(cat .gitmodules | head -n $tmp | tail -n 1 | awk -F '"' '{print $2}')
-                def=$(cat .gitmodules | head -n $i | tail -n $(expr "$i" - "$tmp") | awk -F ' ' '{print $1 $2 $3}')
-                path=$(echo "$def" | grep '^path=' | awk -F '=' '{print $2}')
-                url=$(echo "$def" | grep '^url=' | awk -F '=' '{print $2}')
-                branch=$(echo "$def" | grep '^branch=' | awk -F '=' '{print $2}')
-
-                if ! ls "$path"/* >/dev/null 2>/dev/null; then
-                    git=$(which git)
-                    if ! [ $? -eq 0 ] || ! [ -x $git ]; then
-                        echo "Failed retrieving missing files"
-                        exit 5
-                    fi
-                    res=$(git clone "$url" "$path" 2>&1)
-                    if ! [ $? -eq 0 ] || ! [ -d $path ]; then
-                        echo "Failed retrieving missing files: $res"
-                        exit 5
-                    fi
-                    if [ -n "$branch" ]; then
-                        olddir="$(pwd)"
-                        cd "$path"
-                        res=$(git checkout "$branch" 2>&1)
-                        if ! [ $? -eq 0 ]; then
-                            echo "Failed retrieving missing files: $res"
-                            exit 5
-                        fi
-                        cd "$olddir"
-                    fi
-                    echo "Submodule path '$path': checked out '$branch' (via git clone)"
-                fi
-            fi
-            tmp=$i
-        done
-    fi
-fi
-
-if [ "$FETCH_ONLY" = "yes" ]; then exit 0; fi
 
 if [ ! -x "$(which cmake 2>/dev/null)" ]
 then
@@ -258,7 +213,6 @@ cmake -G "$cmake_type" \
     -DENABLED_PLUGINS="$ENABLED_PLUGINS" \
     -DDISABLED_PLUGINS="$DISABLED_PLUGINS" \
     -DBUILD_TESTS="$BUILD_TESTS" \
-    -DBUILD_LIBSIGNAL_IN_TREE="$BUILD_LIBSIGNAL_IN_TREE" \
     -DUSE_SOUP3="$USE_SOUP3" \
     -DVALA_EXECUTABLE="$VALAC" \
     -DCMAKE_VALA_FLAGS="$VALACFLAGS" \
@@ -286,7 +240,15 @@ cd ..
 
 cat << EOF > Makefile
 default:
+	@echo "Warning in Makefile:"
+	@echo "  Using CMake, ./configure or make to build Dino is deprecated and will be"
+	@echo "  removed before the 0.5 release.  Use Meson instead."
+	@echo ""
 	@sh -c "cd build; $exec_command"
+	@echo ""
+	@echo "Warning in Makefile:"
+	@echo "  Using CMake, ./configure or make to build Dino is deprecated and will be"
+	@echo "  removed before the 0.5 release.  Use Meson instead."
 distclean: clean uninstall
 	
 test: default
@@ -296,3 +258,8 @@ test: default
 EOF
 
 echo "-- Configured. Type 'make' to build, 'make install' to install."
+
+echo ""
+echo "Warning in ./configure:"
+echo "  Using CMake, ./configure or make to build Dino is deprecated and will be"
+echo "  removed before the 0.5 release.  Use Meson instead."

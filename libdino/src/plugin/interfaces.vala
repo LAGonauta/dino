@@ -55,10 +55,19 @@ public abstract class AccountSettingsEntry : Object {
     public abstract Object? get_widget(WidgetType type);
 }
 
+public abstract class EncryptionPreferencesEntry : Object {
+    public abstract string id { get; }
+    public virtual Priority priority { get { return Priority.DEFAULT; } }
+
+    public abstract Object? get_widget(Account account, WidgetType type);
+}
+
 public interface ContactDetailsProvider : Object {
     public abstract string id { get; }
+    public abstract string tab { get; }
 
     public abstract void populate(Conversation conversation, ContactDetails contact_details, WidgetType type);
+    public abstract Object? get_widget(Conversation conversation);
 }
 
 public class ContactDetails : Object {
@@ -151,8 +160,9 @@ public interface ConversationItemWidgetInterface: Object {
     public abstract void set_widget(Object object, WidgetType type, int priority);
 }
 
-public delegate void MessageActionEvoked(Object button, Plugins.MetaConversationItem evoked_on, Object widget);
+public delegate void MessageActionEvoked(Variant? variant);
 public class MessageAction : Object {
+    public string name;
     public bool sensitive = true;
     public string icon_name;
     public string? tooltip;

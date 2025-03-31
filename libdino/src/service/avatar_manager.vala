@@ -12,6 +12,7 @@ public class AvatarManager : StreamInteractionModule, Object {
     public string id { get { return IDENTITY.id; } }
 
     public signal void received_avatar(Jid jid, Account account);
+    public signal void fetched_avatar(Jid jid, Account account);
 
     private enum Source {
         USER_AVATARS,
@@ -25,6 +26,7 @@ public class AvatarManager : StreamInteractionModule, Object {
     private HashMap<Jid, string> vcard_avatars = new HashMap<Jid, string>(Jid.hash_func, Jid.equals_func);
     private HashMap<string, Pixbuf> cached_pixbuf = new HashMap<string, Pixbuf>();
     private HashMap<string, Gee.List<SourceFuncWrapper>> pending_pixbuf = new HashMap<string, Gee.List<SourceFuncWrapper>>();
+    private HashSet<string> pending_fetch = new HashSet<string>();
     private const int MAX_PIXEL = 192;
 
     public static void start(StreamInteractor stream_interactor, Database db) {
@@ -35,14 +37,57 @@ public class AvatarManager : StreamInteractionModule, Object {
     private AvatarManager(StreamInteractor stream_interactor, Database db) {
         this.stream_interactor = stream_interactor;
         this.db = db;
-        this.folder = Path.build_filename(Dino.get_storage_dir(), "avatars");
-        DirUtils.create_with_parents(this.folder, 0700);
+
+        File old_avatars = File.new_build_filename(Dino.get_storage_dir(), "avatars");
+        File new_avatars = File.new_build_filename(Dino.get_cache_dir(), "avatars");
+        this.folder = new_avatars.get_path();
+
+        // Move old avatar location to new one
+        if (old_avatars.query_exists()) {
+            if (!new_avatars.query_exists()) {
+                // Move old avatars folder (~/.local/share/dino) to new location (~/.cache/dino)
+                try {
+                    new_avatars.get_parent().make_directory_with_parents();
+                } catch (Error e) { }
+                try {
+                    old_avatars.move(new_avatars, FileCopyFlags.NONE);
+                    debug("Avatars directory %s moved to %s", old_avatars.get_path(), new_avatars.get_path());
+                } catch (Error e) { }
+            } else {
+                // If both old and new folders exist, remove the old one
+                try {
+                    FileEnumerator enumerator = old_avatars.enumerate_children("standard::*", FileQueryInfoFlags.NOFOLLOW_SYMLINKS);
+                    FileInfo info = null;
+                    while ((info = enumerator.next_file()) != null) {
+                        FileUtils.remove(old_avatars.get_path() + "/" + info.get_name());
+                    }
+                    DirUtils.remove(old_avatars.get_path());
+                } catch (Error e) { }
+            }
+        }
+
+        // Create avatar folder
+        try {
+            new_avatars.make_directory_with_parents();
+        } catch (Error e) { }
 
         stream_interactor.account_added.connect(on_account_added);
         stream_interactor.module_manager.initialize_account_modules.connect((_, modules) => {
             modules.add(new Xep.UserAvatars.Module());
             modules.add(new Xep.VCard.Module());
         });
+    }
+
+    public File? get_avatar_file(Account account, Jid jid_) {
+        string? hash = get_avatar_hash(account, jid_);
+        if (hash == null) return null;
+        File file = File.new_for_path(Path.build_filename(folder, hash));
+        if (!file.query_exists()) {
+            fetch_and_store_for_jid.begin(account, jid_);
+            return null;
+        } else {
+            return file;
+        }
     }
 
     private string? get_avatar_hash(Account account, Jid jid_) {
@@ -59,6 +104,7 @@ public class AvatarManager : StreamInteractionModule, Object {
         }
     }
 
+    [Version (deprecated = true)]
     public bool has_avatar_cached(Account account, Jid jid) {
         string? hash = get_avatar_hash(account, jid);
         return hash != null && cached_pixbuf.has_key(hash);
@@ -68,6 +114,7 @@ public class AvatarManager : StreamInteractionModule, Object {
         return get_avatar_hash(account, jid) != null;
     }
 
+    [Version (deprecated = true)]
     public Pixbuf? get_cached_avatar(Account account, Jid jid_) {
         string? hash = get_avatar_hash(account, jid_);
         if (hash == null) return null;
@@ -75,6 +122,7 @@ public class AvatarManager : StreamInteractionModule, Object {
         return null;
     }
 
+    [Version (deprecated = true)]
     public async Pixbuf? get_avatar(Account account, Jid jid_) {
         Jid jid = jid_;
         if (!stream_interactor.get_module(MucManager.IDENTITY).is_groupchat_occupant(jid_, account)) {
@@ -111,17 +159,7 @@ public class AvatarManager : StreamInteractionModule, Object {
         if (image != null) {
             cached_pixbuf[hash] = image;
         } else {
-            Bytes? bytes = null;
-            if (source == 1) {
-                bytes = yield Xmpp.Xep.UserAvatars.fetch_image(stream, jid, hash);
-            } else if (source == 2) {
-                bytes = yield Xmpp.Xep.VCard.fetch_image(stream, jid, hash);
-                if (bytes == null && jid.is_bare()) {
-                    db.avatar.delete().with(db.avatar.jid_id, "=", db.get_jid_id(jid)).perform();
-                }
-            }
-            if (bytes != null) {
-                store_image(hash, bytes);
+            if (yield fetch_and_store(stream, account, jid, source, hash)) {
                 image = yield get_image(hash);
             }
             cached_pixbuf[hash] = image;
@@ -153,30 +191,32 @@ public class AvatarManager : StreamInteractionModule, Object {
         }
     }
 
+    public void unset_avatar(Account account) {
+        XmppStream stream = stream_interactor.get_stream(account);
+        if (stream == null) return;
+        Xmpp.Xep.UserAvatars.unset_avatar(stream);
+    }
+
     private void on_account_added(Account account) {
         stream_interactor.module_manager.get_module(account, Xep.UserAvatars.Module.IDENTITY).received_avatar_hash.connect((stream, jid, id) =>
-            on_user_avatar_received.begin(account, jid, id)
+            on_user_avatar_received(account, jid, id)
         );
+        stream_interactor.module_manager.get_module(account, Xep.UserAvatars.Module.IDENTITY).avatar_removed.connect((stream, jid) => {
+            on_user_avatar_removed(account, jid);
+        });
         stream_interactor.module_manager.get_module(account, Xep.VCard.Module.IDENTITY).received_avatar_hash.connect((stream, jid, id) =>
-            on_vcard_avatar_received.begin(account, jid, id)
+            on_vcard_avatar_received(account, jid, id)
         );
 
         foreach (var entry in get_avatar_hashes(account, Source.USER_AVATARS).entries) {
-            user_avatars[entry.key] = entry.value;
+            on_user_avatar_received(account, entry.key, entry.value);
         }
         foreach (var entry in get_avatar_hashes(account, Source.VCARD).entries) {
-
-            // FIXME: remove. temporary to remove falsely saved avatars.
-            if (stream_interactor.get_module(MucManager.IDENTITY).is_groupchat(entry.key, account)) {
-                db.avatar.delete().with(db.avatar.jid_id, "=", db.get_jid_id(entry.key)).perform();
-                continue;
-            }
-
-            vcard_avatars[entry.key] = entry.value;
+            on_vcard_avatar_received(account, entry.key, entry.value);
         }
     }
 
-    private async void on_user_avatar_received(Account account, Jid jid_, string id) {
+    private void on_user_avatar_received(Account account, Jid jid_, string id) {
         Jid jid = jid_.bare_jid;
 
         if (!user_avatars.has_key(jid) || user_avatars[jid] != id) {
@@ -186,7 +226,14 @@ public class AvatarManager : StreamInteractionModule, Object {
         received_avatar(jid, account);
     }
 
-    private async void on_vcard_avatar_received(Account account, Jid jid_, string id) {
+    private void on_user_avatar_removed(Account account, Jid jid_) {
+        Jid jid = jid_.bare_jid;
+        user_avatars.unset(jid);
+        remove_avatar_hash(account, jid, Source.USER_AVATARS);
+        received_avatar(jid, account);
+    }
+
+    private void on_vcard_avatar_received(Account account, Jid jid_, string id) {
         bool is_gc = stream_interactor.get_module(MucManager.IDENTITY).might_be_groupchat(jid_.bare_jid, account);
         Jid jid = is_gc ? jid_ : jid_.bare_jid;
 
@@ -208,6 +255,14 @@ public class AvatarManager : StreamInteractionModule, Object {
             .perform();
     }
 
+    public void remove_avatar_hash(Account account, Jid jid, int type) {
+        db.avatar.delete()
+            .with(db.avatar.jid_id, "=", db.get_jid_id(jid))
+            .with(db.avatar.account_id, "=", account.id)
+            .with(db.avatar.type_, "=", type)
+            .perform();
+    }
+
     public HashMap<Jid, string> get_avatar_hashes(Account account, int type) {
         HashMap<Jid, string> ret = new HashMap<Jid, string>(Jid.hash_func, Jid.equals_func);
         foreach (Row row in db.avatar.select({db.avatar.jid_id, db.avatar.hash})
@@ -218,12 +273,53 @@ public class AvatarManager : StreamInteractionModule, Object {
         return ret;
     }
 
-    public void store_image(string id, Bytes data) {
+    public async bool fetch_and_store_for_jid(Account account, Jid jid) {
+        int source = -1;
+        string? hash = null;
+        if (user_avatars.has_key(jid)) {
+            hash = user_avatars[jid];
+            source = 1;
+        } else if (vcard_avatars.has_key(jid)) {
+            hash = vcard_avatars[jid];
+            source = 2;
+        } else {
+            return false;
+        }
+
+        XmppStream? stream = stream_interactor.get_stream(account);
+        if (stream == null || !stream.negotiation_complete) return false;
+
+        return yield fetch_and_store(stream, account, jid, source, hash);
+    }
+
+    private async bool fetch_and_store(XmppStream stream, Account account, Jid jid, int source, string? hash) {
+        if (hash == null || pending_fetch.contains(hash)) return false;
+
+        pending_fetch.add(hash);
+        Bytes? bytes = null;
+        if (source == 1) {
+            bytes = yield Xmpp.Xep.UserAvatars.fetch_image(stream, jid, hash);
+        } else if (source == 2) {
+            bytes = yield Xmpp.Xep.VCard.fetch_image(stream, jid, hash);
+            if (bytes == null && jid.is_bare()) {
+                db.avatar.delete().with(db.avatar.jid_id, "=", db.get_jid_id(jid)).perform();
+            }
+        }
+
+        if (bytes != null) {
+            yield store_image(hash, bytes);
+            fetched_avatar(jid, account);
+        }
+        pending_fetch.remove(hash);
+        return bytes != null;
+    }
+
+    private async void store_image(string id, Bytes data) {
         File file = File.new_for_path(Path.build_filename(folder, id));
         try {
             if (file.query_exists()) file.delete(); //TODO y?
             DataOutputStream fos = new DataOutputStream(file.create(FileCreateFlags.REPLACE_DESTINATION));
-            fos.write_bytes_async.begin(data);
+            yield fos.write_bytes_async(data);
         } catch (Error e) {
             // Ignore: we failed in storing, so we refuse to display later...
         }

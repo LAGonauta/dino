@@ -94,21 +94,25 @@ namespace Dino.Ui {
             }
 
             foreach (Jid counterpart in call.counterparts) {
-                AvatarImage image = new AvatarImage() { force_gray=true, margin_top=2 };
-                image.set_conversation_participant(stream_interactor, conversation, counterpart.bare_jid);
-                multiparty_peer_box.append(image);
-                multiparty_peer_widgets.add(image);
+                AvatarPicture picture = new AvatarPicture() { margin_top=2 };
+                picture.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).add_participant(conversation, counterpart.bare_jid);
+                multiparty_peer_box.append(picture);
+                multiparty_peer_widgets.add(picture);
             }
-            AvatarImage image2 = new AvatarImage() { force_gray=true, margin_top=2 };
-            image2.set_conversation_participant(stream_interactor, conversation, call.account.bare_jid);
-            multiparty_peer_box.append(image2);
-            multiparty_peer_widgets.add(image2);
+            AvatarPicture picture2 = new AvatarPicture() { margin_top=2 };
+            picture2.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).add_participant(conversation, call.account.bare_jid);
+            multiparty_peer_box.append(picture2);
+            multiparty_peer_widgets.add(picture2);
 
             outer_additional_box.add_css_class("multiparty-participants");
 
             multiparty_peer_box.visible = true;
             incoming_call_box.visible = false;
             incoming_call_revealer.reveal_child = true;
+        }
+
+        private void on_time_update_timeout() {
+            if (time_update_handler_id != 0) update_call_state();
         }
 
         private void update_call_state() {
@@ -156,14 +160,7 @@ namespace Dino.Ui {
                     string duration = get_duration_string((new DateTime.now_utc()).difference(call.local_time));
                     subtitle_label.label = _("Started %s ago").printf(duration);
 
-                    time_update_handler_id = Timeout.add_seconds(get_next_time_change() + 1, () => {
-                        if (time_update_handler_id != 0) {
-                            Source.remove(time_update_handler_id);
-                            time_update_handler_id = 0;
-                            update_call_state();
-                        }
-                        return true;
-                    });
+                    time_update_handler_id = Dino.WeakTimeout.add_seconds_once(get_next_time_change() + 1, this, on_time_update_timeout);
 
                     break;
                 case Call.State.OTHER_DEVICE:

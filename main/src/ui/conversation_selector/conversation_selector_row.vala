@@ -12,16 +12,12 @@ namespace Dino.Ui {
 [GtkTemplate (ui = "/im/dino/Dino/conversation_row.ui")]
 public class ConversationSelectorRow : ListBoxRow {
 
-    [GtkChild] protected unowned AvatarImage image;
+    [GtkChild] protected unowned AvatarPicture picture;
     [GtkChild] protected unowned Label name_label;
     [GtkChild] protected unowned Label time_label;
     [GtkChild] protected unowned Label nick_label;
     [GtkChild] protected unowned Label message_label;
     [GtkChild] protected unowned Label unread_count_label;
-    [GtkChild] protected unowned Button x_button;
-    [GtkChild] protected unowned Revealer time_revealer;
-    [GtkChild] protected unowned Revealer xbutton_revealer;
-    [GtkChild] protected unowned Revealer top_row_revealer;
     [GtkChild] protected unowned Image pinned_image;
     [GtkChild] public unowned Revealer main_revealer;
 
@@ -98,10 +94,7 @@ public class ConversationSelectorRow : ListBoxRow {
 
         last_content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_latest(conversation);
 
-        x_button.clicked.connect(() => {
-            stream_interactor.get_module(ConversationManager.IDENTITY).close_conversation(conversation);
-        });
-        image.set_conversation(stream_interactor, conversation);
+        picture.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).set_conversation(conversation);
         conversation.notify["read-up-to-item"].connect(() => update_read());
         conversation.notify["pinned"].connect(() => { update_pinned_icon(); });
 
@@ -225,7 +218,21 @@ public class ConversationSelectorRow : ListBoxRow {
         label.attributes = copy;
     }
 
+    private bool update_read_pending = false;
+    private bool update_read_pending_force = false;
     protected void update_read(bool force_update = false) {
+        if (force_update) update_read_pending_force = true;
+        if (update_read_pending) return;
+        update_read_pending = true;
+        Idle.add(() => {
+            update_read_pending = false;
+            update_read_pending_force = false;
+            update_read_idle(update_read_pending_force);
+            return Source.REMOVE;
+        }, Priority.LOW);
+    }
+
+    private void update_read_idle(bool force_update = false) {
         int current_num_unread = stream_interactor.get_module(ChatInteraction.IDENTITY).get_num_unread(conversation);
         if (num_unread == current_num_unread && !force_update) return;
         num_unread = current_num_unread;
@@ -253,19 +260,6 @@ public class ConversationSelectorRow : ListBoxRow {
             change_label_attribute(time_label, attr_weight_new(Weight.BOLD));
             change_label_attribute(nick_label, attr_weight_new(Weight.BOLD));
             change_label_attribute(message_label, attr_weight_new(Weight.BOLD));
-        }
-    }
-
-    public override void state_flags_changed(StateFlags flags) {
-        StateFlags curr_flags = get_state_flags();
-        if ((curr_flags & StateFlags.PRELIGHT) != 0) {
-            time_revealer.set_reveal_child(false);
-            top_row_revealer.set_reveal_child(false);
-            xbutton_revealer.set_reveal_child(true);
-        } else {
-            time_revealer.set_reveal_child(true);
-            top_row_revealer.set_reveal_child(true);
-            xbutton_revealer.set_reveal_child(false);
         }
     }
 

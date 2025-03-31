@@ -29,6 +29,8 @@ public class ConversationManager : StreamInteractionModule, Object {
         stream_interactor.account_removed.connect(on_account_removed);
         stream_interactor.get_module(MessageProcessor.IDENTITY).received_pipeline.connect(new MessageListener(stream_interactor));
         stream_interactor.get_module(MessageProcessor.IDENTITY).message_sent.connect(handle_sent_message);
+        stream_interactor.get_module(Calls.IDENTITY).call_incoming.connect(handle_new_call);
+        stream_interactor.get_module(Calls.IDENTITY).call_outgoing.connect(handle_new_call);
     }
 
     public Conversation create_conversation(Jid jid, Account account, Conversation.Type? type = null) {
@@ -46,6 +48,14 @@ public class ConversationManager : StreamInteractionModule, Object {
 
         // Create a new converation
         Conversation conversation = new Conversation(jid, account, type);
+        // Set encryption for conversation
+        if (type == Conversation.Type.CHAT ||
+                (type == Conversation.Type.GROUPCHAT && stream_interactor.get_module(MucManager.IDENTITY).is_private_room(account, jid))) {
+            conversation.encryption = Application.get_default().settings.get_default_encryption(account);
+        } else {
+            conversation.encryption = Encryption.NONE;
+        }
+
         add_conversation(conversation);
         conversation.persist(db);
         return conversation;
@@ -192,6 +202,11 @@ public class ConversationManager : StreamInteractionModule, Object {
         if (is_recent) {
             start_conversation(conversation);
         }
+    }
+
+    private void handle_new_call(Call call, CallState state, Conversation conversation) {
+        conversation.last_active = call.time;
+        start_conversation(conversation);
     }
 
     private void add_conversation(Conversation conversation) {

@@ -54,6 +54,7 @@ public class MucManager : StreamInteractionModule, Object {
             }
             return true;
         });
+        stream_interactor.get_module(MessageProcessor.IDENTITY).build_message_stanza.connect(on_build_message_stanza);
     }
 
     // already_autojoin: Without this flag we'd be retrieving bookmarks (to check for autojoin) from the sender on every join
@@ -72,7 +73,7 @@ public class MucManager : StreamInteractionModule, Object {
 
         bool receive_history = true;
         EntityInfo entity_info = stream_interactor.get_module(EntityInfo.IDENTITY);
-        bool can_do_mam = yield entity_info.has_feature(account, jid, Xmpp.MessageArchiveManagement.NS_URI_2);
+        bool can_do_mam = yield entity_info.has_feature(account, jid, Xmpp.MessageArchiveManagement.NS_URI);
         if (can_do_mam) {
             receive_history = false;
             history_since = null;
@@ -82,11 +83,6 @@ public class MucManager : StreamInteractionModule, Object {
             mucs_joining[account] = new HashSet<Jid>(Jid.hash_bare_func, Jid.equals_bare_func);
         }
         mucs_joining[account].add(jid);
-
-        if (!mucs_todo.has_key(account)) {
-            mucs_todo[account] = new HashSet<Jid>(Jid.hash_bare_func, Jid.equals_bare_func);
-        }
-        mucs_todo[account].add(jid.with_resource(nick_));
 
         Muc.JoinResult? res = yield stream.get_module(Xep.Muc.Module.IDENTITY).enter(stream, jid.bare_jid, nick_, password, history_since, receive_history, null);
 
@@ -125,6 +121,11 @@ public class MucManager : StreamInteractionModule, Object {
             // Join failed
             enter_errors[jid] = res.muc_error;
         }
+
+        if (!mucs_todo.has_key(account)) {
+            mucs_todo[account] = new HashSet<Jid>(Jid.hash_bare_func, Jid.equals_bare_func);
+        }
+        mucs_todo[account].add(jid.with_resource(res.nick ?? nick_));
 
         return res;
     }
@@ -231,15 +232,8 @@ public class MucManager : StreamInteractionModule, Object {
 
     //the term `private room` is a short hand for members-only+non-anonymous rooms
     public bool is_private_room(Account account, Jid jid) {
-        XmppStream? stream = stream_interactor.get_stream(account);
-        if (stream == null) {
-            return false;
-        }
-        Xep.Muc.Flag? flag = stream.get_flag(Xep.Muc.Flag.IDENTITY);
-        if (flag == null) {
-            return false;
-        }
-        return flag.has_room_feature(jid, Xep.Muc.Feature.NON_ANONYMOUS) && flag.has_room_feature(jid, Xep.Muc.Feature.MEMBERS_ONLY);
+        var entity_info = stream_interactor.get_module(EntityInfo.IDENTITY);
+        return entity_info.has_feature_offline(account, jid, "muc_membersonly") && entity_info.has_feature_offline(account, jid, "muc_nonanonymous");
     }
 
     public bool is_moderated_room(Account account, Jid jid) {
@@ -649,6 +643,12 @@ public class MucManager : StreamInteractionModule, Object {
             part(account, jid);
         }
         conference_removed(account, jid);
+    }
+
+    private void on_build_message_stanza(Entities.Message message, Xmpp.MessageStanza message_stanza, Conversation conversation) {
+        if (conversation.type_ == Conversation.Type.GROUPCHAT_PM) {
+            Xmpp.Xep.Muc.add_muc_pm_message_stanza_x_node(message_stanza);            
+        }
     }
 
     private void self_ping(Account account) {

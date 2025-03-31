@@ -9,6 +9,11 @@ find_packages(ENGINE_PACKAGES REQUIRED
 
 set(ENGINE_EXTRA_OPTIONS ${MAIN_EXTRA_OPTIONS} --vapidir=${CMAKE_CURRENT_SOURCE_DIR}/vapi)
 
+set(ENGINE_DEFINITIONS)
+if(VALA_VERSION VERSION_EQUAL "0.56.11")
+    set(ENGINE_DEFINITIONS ${ENGINE_DEFINITIONS} VALA_0_56_11)
+endif()
+
 vala_precompile(ENGINE_VALA_C
 SOURCES
     "src/core/direct_tls_xmpp_stream.vala"
@@ -50,6 +55,7 @@ SOURCES
 
     "src/module/xep/0048_bookmarks.vala"
     "src/module/xep/0048_conference.vala"
+    "src/module/xep/0394_message_markup.vala"
     "src/module/xep/0402_bookmarks2.vala"
     "src/module/xep/0004_data_forms.vala"
 
@@ -75,6 +81,7 @@ SOURCES
     "src/module/xep/0082_date_time_profiles.vala"
     "src/module/xep/0084_user_avatars.vala"
     "src/module/xep/0085_chat_state_notifications.vala"
+    "src/module/xep/0104_http_scheme_url_data.vala"
     "src/module/xep/0115_entity_capabilities.vala"
 
     "src/module/xep/0166_jingle/content.vala"
@@ -106,6 +113,9 @@ SOURCES
     "src/module/xep/0384_omemo/omemo_encryptor.vala"
     "src/module/xep/0384_omemo/omemo_decryptor.vala"
 
+    "src/module/xep/0392_consistent_color/consistent_color.vala"
+    "src/module/xep/0392_consistent_color/hsluv.vala"
+
     "src/module/xep/0184_message_delivery_receipts.vala"
     "src/module/xep/0191_blocking_command.vala"
     "src/module/xep/0198_stream_management.vala"
@@ -116,26 +126,31 @@ SOURCES
     "src/module/xep/0249_direct_muc_invitations.vala"
     "src/module/xep/0260_jingle_socks5_bytestreams.vala"
     "src/module/xep/0261_jingle_in_band_bytestreams.vala"
+    "src/module/xep/0264_jingle_content_thumbnails.vala"
     "src/module/xep/0272_muji.vala"
     "src/module/xep/0280_message_carbons.vala"
     "src/module/xep/0297_stanza_forwarding.vala"
     "src/module/xep/0298_coin.vala"
+    "src/module/xep/0300_cryptographic_hashes.vala"
     "src/module/xep/0308_last_message_correction.vala"
     "src/module/xep/0313_message_archive_management.vala"
     "src/module/xep/0313_2_message_archive_management.vala"
     "src/module/xep/0333_chat_markers.vala"
     "src/module/xep/0334_message_processing_hints.vala"
     "src/module/xep/0353_jingle_message_initiation.vala"
-    "src/module/xep/0353_call_invite_message.vala"
     "src/module/xep/0359_unique_stable_stanza_ids.vala"
     "src/module/xep/0363_http_file_upload.vala"
+    "src/module/xep/0367_message_attaching.vala"
     "src/module/xep/0380_explicit_encryption.vala"
     "src/module/xep/0391_jingle_encrypted_transports.vala"
     "src/module/xep/0410_muc_self_ping.vala"
     "src/module/xep/0421_occupant_ids.vala"
     "src/module/xep/0428_fallback_indication.vala"
     "src/module/xep/0444_reactions.vala"
+    "src/module/xep/0446_file_metadata_element.vala"
+    "src/module/xep/0447_stateless_file_sharing.vala"
     "src/module/xep/0461_replies.vala"
+    "src/module/xep/0482_call_invites.vala"
     "src/module/xep/pixbuf_storage.vala"
 
     "src/util.vala"
@@ -149,6 +164,8 @@ CUSTOM_VAPIS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/glib_fixes.vapi"
 OPTIONS
     ${ENGINE_EXTRA_OPTIONS}
+DEFINITIONS
+    ${ENGINE_DEFINITIONS}
 )
 
 add_custom_target(xmpp-vala-vapi
@@ -160,7 +177,7 @@ DEPENDS
 add_definitions(${VALA_CFLAGS} -DG_LOG_DOMAIN="xmpp-vala")
 add_library(xmpp-vala SHARED ${ENGINE_VALA_C})
 add_dependencies(xmpp-vala xmpp-vala-vapi)
-target_link_libraries(xmpp-vala ${ENGINE_PACKAGES})
+target_link_libraries(xmpp-vala ${ENGINE_PACKAGES} m)
 set_target_properties(xmpp-vala PROPERTIES VERSION 0.1 SOVERSION 0)
 
 install(TARGETS xmpp-vala ${TARGET_INSTALL})
@@ -175,6 +192,7 @@ if(BUILD_TESTS)
 
         "tests/jid.vala"
         "tests/stanza.vala"
+        "tests/color.vala"
         "tests/util.vala"
     CUSTOM_VAPIS
         ${CMAKE_BINARY_DIR}/exports/xmpp-vala_internal.vapi

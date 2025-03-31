@@ -113,11 +113,11 @@ public class Dino.Ui.CallBottomBar : Gtk.Box {
 
     public void on_audio_enabled_changed() {
         if (audio_enabled) {
-            audio_image.icon_name = "dino-microphone-symbolic";
+            audio_image.icon_name = "audio-input-microphone-symbolic";
             audio_button.add_css_class("white-button");
             audio_button.remove_css_class("transparent-white-button");
         } else {
-            audio_image.icon_name = "dino-microphone-off-symbolic";
+            audio_image.icon_name = "microphone-disabled-symbolic";
             audio_button.remove_css_class("white-button");
             audio_button.add_css_class("transparent-white-button");
         }
@@ -138,7 +138,7 @@ public class Dino.Ui.CallBottomBar : Gtk.Box {
 
     public void show_counterpart_ended(string text) {
         stack.set_visible_child_name("label");
-        label.label = text;
+        label.label = Util.unbreak_space_around_non_spacing_mark(text);
     }
 
     public bool is_menu_active() {

@@ -8,8 +8,8 @@
     </style>
     <child>
       <object class="DinoUiSizingBin">
-        <property name="target-width">500</property>
-        <property name="max-width">500</property>
+        <property name="target-width">400</property>
+        <property name="max-width">400</property>
         <property name="hexpand">True</property>
         <child>
           <object class="GtkBox">
@@ -80,7 +80,7 @@
             </child>
             <child>
               <object class="GtkMenuButton" id="file_menu">
-                <property name="icon-name">open-menu-symbolic</property>
+                <property name="icon-name">view-more-symbolic</property>
                 <property name="opacity">0</property>
                 <property name="has_frame">False</property>
               </object>

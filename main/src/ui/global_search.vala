@@ -98,6 +98,8 @@ public class GlobalSearch {
     }
 
     private void on_key_released(uint keyval, uint keycode, Gdk.ModifierType state) {
+        if (!auto_complete_overlay.visible) return;
+
         if (keyval == Gdk.Key.Return) {
             auto_complete_list.get_selected_row().activate();
         }
@@ -116,15 +118,15 @@ public class GlobalSearch {
             // Populate new suggestions
             foreach(SearchSuggestion suggestion in suggestions) {
                 Builder builder = new Builder.from_resource("/im/dino/Dino/search_autocomplete.ui");
-                AvatarImage avatar = (AvatarImage)builder.get_object("image");
+                AvatarPicture avatar = (AvatarPicture)builder.get_object("picture");
                 Label label = (Label)builder.get_object("label");
                 string display_name;
                 if (suggestion.conversation.type_ == Conversation.Type.GROUPCHAT && !suggestion.conversation.counterpart.equals(suggestion.jid) || suggestion.conversation.type_ == Conversation.Type.GROUPCHAT_PM) {
                     display_name = Util.get_participant_display_name(stream_interactor, suggestion.conversation, suggestion.jid);
-                    avatar.set_conversation_participant(stream_interactor, suggestion.conversation, suggestion.jid);
+                    avatar.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).add_participant(suggestion.conversation, suggestion.jid);
                 } else {
                     display_name = Util.get_conversation_display_name(stream_interactor, suggestion.conversation);
-                    avatar.set_conversation(stream_interactor, suggestion.conversation);
+                    avatar.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).set_conversation(suggestion.conversation);
                 }
                 if (display_name != suggestion.jid.to_string()) {
                     label.set_markup("%s <span font_weight='light' fgalpha='80%%'>%s</span>".printf(Markup.escape_text(display_name), Markup.escape_text(suggestion.jid.to_string())));
@@ -223,15 +225,16 @@ public class GlobalSearch {
         grid.margin_top = 3;
         grid.margin_bottom = 3;
 
-        string text = item.message.body.replace("\n", "").replace("\r", "");
-        if (text.length > 200) {
+        string text = Util.unbreak_space_around_non_spacing_mark(item.message.body.replace("\n", "").replace("\r", ""));
+        if (text.char_count() > 200) {
             int index = text.index_of(search);
-            if (index + search.length <= 100) {
-                text = text.substring(0, 150) + " … " + text.substring(text.length - 50, 50);
-            } else if (index >= text.length - 100) {
-                text = text.substring(0, 50) + " … " + text.substring(text.length - 150, 150);
+            int char_index = index < 0 ? 0 : text.char_count(index);
+            if (char_index + search.char_count() <= 100) {
+                text = text.substring(0, text.index_of_nth_char(150)) + " … " + text.substring(text.index_of_nth_char(text.char_count() - 50));
+            } else if (char_index >= text.char_count() - 100) {
+                text = text.substring(0, text.index_of_nth_char(50)) + " … " + text.substring(text.index_of_nth_char(text.char_count() - 150));
             } else {
-                text = text.substring(0, 25) + " … " + text.substring(index - 50, 50) + text.substring(index, 100) + " … " + text.substring(text.length - 25, 25);
+                text = text.substring(0, text.index_of_nth_char(25)) + " … " + text.substring(text.index_of_nth_char(char_index - 50), text.index_of_nth_char(char_index + 100)) + " … " + text.substring(text.index_of_nth_char(text.char_count() - 25));
             }
         }
         Label label = new Label("") { use_markup=true, xalign=0, selectable=true, wrap=true, wrap_mode=Pango.WrapMode.WORD_CHAR, vexpand=true };
@@ -260,7 +263,8 @@ public class GlobalSearch {
             for (; match_info.matches(); match_info.next()) {
                 int start, end;
                 match_info.fetch_pos(0, out start, out end);
-                markup_text += Markup.escape_text(text[last_end:start]) + "<span bgcolor=\"yellow\">" + Markup.escape_text(text[start:end]) + "</span>";
+                string themed_span = Util.is_dark_theme(label) ? "<span color=\"black\" bgcolor=\"yellow\">" : "<span bgcolor=\"yellow\">";
+                markup_text += Markup.escape_text(text[last_end:start]) + themed_span + Markup.escape_text(text[start:end]) + "</span>";
                 last_end = end;
             }
             markup_text += Markup.escape_text(text[last_end:text.length]);
@@ -289,10 +293,10 @@ public class GlobalSearch {
     }
 
     private Grid get_skeleton(MessageItem item) {
-        AvatarImage image = new AvatarImage() { height=32, width=32, margin_end=7, valign=Align.START, allow_gray = false };
-        image.set_conversation_participant(stream_interactor, item.conversation, item.jid);
+        AvatarPicture picture = new AvatarPicture() { height_request=32, width_request=32, margin_end=7, valign=Align.START };
+        picture.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).add_participant(item.conversation, item.jid);
         Grid grid = new Grid() { row_homogeneous=false };
-        grid.attach(image, 0, 0, 1, 2);
+        grid.attach(picture, 0, 0, 1, 2);
 
         string display_name = Util.get_participant_display_name(stream_interactor, item.conversation, item.jid);
         Label name_label = new Label(display_name) { ellipsize=EllipsizeMode.END, xalign=0 };

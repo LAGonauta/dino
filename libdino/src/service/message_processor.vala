@@ -38,24 +38,12 @@ public class MessageProcessor : StreamInteractionModule, Object {
         received_pipeline.connect(new FilterMessageListener());
         received_pipeline.connect(new StoreMessageListener(this, stream_interactor));
         received_pipeline.connect(new StoreContentItemListener(stream_interactor));
-        received_pipeline.connect(new MamMessageListener(stream_interactor));
+        received_pipeline.connect(new MarkupListener(stream_interactor));
 
         stream_interactor.account_added.connect(on_account_added);
 
         stream_interactor.stream_negotiated.connect(send_unsent_chat_messages);
         stream_interactor.stream_resumed.connect(send_unsent_chat_messages);
-    }
-
-    public Entities.Message send_text(string text, Conversation conversation) {
-        Entities.Message message = create_out_message(text, conversation);
-        return send_message(message, conversation);
-    }
-
-    public Entities.Message send_message(Entities.Message message, Conversation conversation) {
-        stream_interactor.get_module(ContentItemStore.IDENTITY).insert_message(message, conversation);
-        send_xmpp_message(message, conversation);
-        message_sent(message, conversation);
-        return message;
     }
 
     private void convert_sending_to_unsent_msgs(Account account) {
@@ -168,21 +156,22 @@ public class MessageProcessor : StreamInteractionModule, Object {
         new_message.counterpart = counterpart_override ?? (new_message.direction == Entities.Message.DIRECTION_SENT ? message.to : message.from);
         new_message.ourpart = new_message.direction == Entities.Message.DIRECTION_SENT ? message.from : message.to;
 
-        XmppStream? stream = stream_interactor.get_stream(account);
         Xmpp.MessageArchiveManagement.MessageFlag? mam_message_flag = Xmpp.MessageArchiveManagement.MessageFlag.get_flag(message);
-        Xmpp.MessageArchiveManagement.Flag? mam_flag = stream != null ? stream.get_flag(Xmpp.MessageArchiveManagement.Flag.IDENTITY) : null;
         EntityInfo entity_info = stream_interactor.get_module(EntityInfo.IDENTITY);
-        if (mam_message_flag != null && mam_flag != null && mam_flag.ns_ver == Xmpp.MessageArchiveManagement.NS_URI_2 && mam_message_flag.mam_id != null) {
-            new_message.server_id = mam_message_flag.mam_id;
+        if (mam_message_flag != null && mam_message_flag.mam_id != null) {
+            bool server_does_mam = entity_info.has_feature_cached(account, account.bare_jid, Xmpp.MessageArchiveManagement.NS_URI);
+            if (server_does_mam) {
+                new_message.server_id = mam_message_flag.mam_id;
+            }
         } else if (message.type_ == Xmpp.MessageStanza.TYPE_GROUPCHAT) {
             bool server_supports_sid = (yield entity_info.has_feature(account, new_message.counterpart.bare_jid, Xep.UniqueStableStanzaIDs.NS_URI)) ||
-                    (yield entity_info.has_feature(account, new_message.counterpart.bare_jid, Xmpp.MessageArchiveManagement.NS_URI_2));
+                    (yield entity_info.has_feature(account, new_message.counterpart.bare_jid, Xmpp.MessageArchiveManagement.NS_URI));
             if (server_supports_sid) {
                 new_message.server_id = Xep.UniqueStableStanzaIDs.get_stanza_id(message, new_message.counterpart.bare_jid);
             }
         } else if (message.type_ == Xmpp.MessageStanza.TYPE_CHAT) {
             bool server_supports_sid = (yield entity_info.has_feature(account, account.bare_jid, Xep.UniqueStableStanzaIDs.NS_URI)) ||
-                    (yield entity_info.has_feature(account, account.bare_jid, Xmpp.MessageArchiveManagement.NS_URI_2));
+                    (yield entity_info.has_feature(account, account.bare_jid, Xmpp.MessageArchiveManagement.NS_URI));
             if (server_supports_sid) {
                 new_message.server_id = Xep.UniqueStableStanzaIDs.get_stanza_id(message, account.bare_jid);
             }
@@ -318,7 +307,8 @@ public class MessageProcessor : StreamInteractionModule, Object {
         public override string[] after_actions { get { return after_actions_const; } }
 
         public override async bool run(Entities.Message message, Xmpp.MessageStanza stanza, Conversation conversation) {
-            return (message.body == null);
+            return message.body == null &&
+                    Xep.StatelessFileSharing.get_file_shares(stanza) == null;
         }
     }
 
@@ -337,9 +327,26 @@ public class MessageProcessor : StreamInteractionModule, Object {
         }
 
         public override async bool run(Entities.Message message, Xmpp.MessageStanza stanza, Conversation conversation) {
-            if (message.body == null || outer.is_duplicate(message, stanza, conversation)) return true;
-
             stream_interactor.get_module(MessageStorage.IDENTITY).add_message(message, conversation);
+            return false;
+        }
+    }
+
+    private class MarkupListener : MessageListener {
+
+        public string[] after_actions_const = new string[]{ "STORE" };
+        public override string action_group { get { return "Markup"; } }
+        public override string[] after_actions { get { return after_actions_const; } }
+
+        private StreamInteractor stream_interactor;
+
+        public MarkupListener(StreamInteractor stream_interactor) {
+            this.stream_interactor = stream_interactor;
+        }
+
+        public override async bool run(Entities.Message message, Xmpp.MessageStanza stanza, Conversation conversation) {
+            Gee.List<MessageMarkup.Span> markups = MessageMarkup.get_spans(stanza);
+            message.persist_markups(markups, message.id);
             return false;
         }
     }
@@ -363,30 +370,7 @@ public class MessageProcessor : StreamInteractionModule, Object {
         }
     }
 
-    private class MamMessageListener : MessageListener {
-
-        public string[] after_actions_const = new string[]{ "DEDUPLICATE" };
-        public override string action_group { get { return "MAM_NODE"; } }
-        public override string[] after_actions { get { return after_actions_const; } }
-
-        private StreamInteractor stream_interactor;
-
-        public MamMessageListener(StreamInteractor stream_interactor) {
-            this.stream_interactor = stream_interactor;
-        }
-
-        public override async bool run(Entities.Message message, Xmpp.MessageStanza stanza, Conversation conversation) {
-            bool is_mam_message = Xmpp.MessageArchiveManagement.MessageFlag.get_flag(stanza) != null;
-            XmppStream? stream = stream_interactor.get_stream(conversation.account);
-            Xmpp.MessageArchiveManagement.Flag? mam_flag = stream != null ? stream.get_flag(Xmpp.MessageArchiveManagement.Flag.IDENTITY) : null;
-            if (is_mam_message || (mam_flag != null && mam_flag.cought_up == true)) {
-                conversation.account.mam_earliest_synced = message.local_time;
-            }
-            return false;
-        }
-    }
-
-    public Entities.Message create_out_message(string text, Conversation conversation) {
+    public Entities.Message create_out_message(string? text, Conversation conversation) {
         Entities.Message message = new Entities.Message(text);
         message.type_ = Util.get_message_type_for_conversation(conversation);
         message.stanza_id = random_uuid();
@@ -429,8 +413,22 @@ public class MessageProcessor : StreamInteractionModule, Object {
             new_message.type_ = MessageStanza.TYPE_CHAT;
         }
 
-        string? fallback = get_fallback_body_set_infos(message, new_message, conversation);
-        new_message.body = fallback == null ? message.body : fallback + message.body;
+        if (message.quoted_item_id != 0) {
+            ContentItem? quoted_content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_item_by_id(conversation, message.quoted_item_id);
+            if (quoted_content_item != null) {
+                Jid? quoted_sender = message.from;
+                string? quoted_stanza_id = stream_interactor.get_module(ContentItemStore.IDENTITY).get_message_id_for_content_item(conversation, quoted_content_item);
+                if (quoted_sender != null && quoted_stanza_id != null) {
+                    Xep.Replies.set_reply_to(new_message, new Xep.Replies.ReplyTo(quoted_sender, quoted_stanza_id));
+                }
+
+                foreach (var fallback in message.get_fallbacks()) {
+                    Xep.FallbackIndication.set_fallback(new_message, fallback);
+                }
+            }
+        }
+
+        MessageMarkup.add_spans(new_message, message.get_markups());
 
         build_message_stanza(message, new_message, conversation);
         pre_message_send(message, new_message, conversation);
@@ -449,6 +447,10 @@ public class MessageProcessor : StreamInteractionModule, Object {
             if(!flag.has_room_feature(conversation.counterpart, Xep.Muc.Feature.STABLE_ID)) {
                 UniqueStableStanzaIDs.set_origin_id(new_message, message.stanza_id);
             }
+        }
+
+        if (conversation.get_send_typing_setting(stream_interactor) == Conversation.Setting.ON) {
+            ChatStateNotifications.add_state_to_message(new_message, ChatStateNotifications.STATE_ACTIVE);
         }
 
         stream.get_module(MessageModule.IDENTITY).send_message.begin(stream, new_message, (_, res) => {
@@ -474,27 +476,6 @@ public class MessageProcessor : StreamInteractionModule, Object {
                 }
             }
         });
-    }
-
-    public string? get_fallback_body_set_infos(Entities.Message message, MessageStanza new_stanza, Conversation conversation) {
-        if (message.quoted_item_id == 0) return null;
-
-        ContentItem? content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_item_by_id(conversation, message.quoted_item_id);
-        if (content_item == null) return null;
-
-        Jid? quoted_sender = stream_interactor.get_module(ContentItemStore.IDENTITY).get_message_sender_for_content_item(conversation, content_item);
-        string? quoted_stanza_id = stream_interactor.get_module(ContentItemStore.IDENTITY).get_message_id_for_content_item(conversation, content_item);
-        if (quoted_sender != null && quoted_stanza_id != null) {
-            Xep.Replies.set_reply_to(new_stanza, new Xep.Replies.ReplyTo(quoted_sender, quoted_stanza_id));
-        }
-
-        string fallback = FallbackBody.get_quoted_fallback_body(content_item);
-
-        long fallback_length = fallback.length;
-        var fallback_location = new Xep.FallbackIndication.FallbackLocation(0, (int)fallback_length);
-        Xep.FallbackIndication.set_fallback(new_stanza, new Xep.FallbackIndication.Fallback(Xep.Replies.NS_URI, new Xep.FallbackIndication.FallbackLocation[] { fallback_location }));
-
-        return fallback;
     }
 }
 

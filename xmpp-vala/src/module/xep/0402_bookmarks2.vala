@@ -68,6 +68,11 @@ public class Module : BookmarksProvider, XmppStreamModule {
     }
 
     private void on_pupsub_item(XmppStream stream, Jid jid, string id, StanzaNode? node) {
+        if (!jid.equals(stream.get_flag(Bind.Flag.IDENTITY).my_jid.bare_jid)) {
+            warning("Received alleged bookmarks:1 item from %s, ignoring", jid.to_string());
+            return;
+        }
+
         Conference conference = parse_item_node(node, id);
         Flag? flag = stream.get_flag(Flag.IDENTITY);
         if (flag != null) {
@@ -77,6 +82,11 @@ public class Module : BookmarksProvider, XmppStreamModule {
     }
 
     private void on_pupsub_retract(XmppStream stream, Jid jid, string id) {
+        if (!jid.equals(stream.get_flag(Bind.Flag.IDENTITY).my_jid.bare_jid)) {
+            warning("Received alleged bookmarks:1 retract from %s, ignoring", jid.to_string());
+            return;
+        }
+
         try {
             Jid jid_parsed = new Jid(id);
             Flag? flag = stream.get_flag(Flag.IDENTITY);
@@ -110,7 +120,7 @@ public class Module : BookmarksProvider, XmppStreamModule {
     }
 
     public override void attach(XmppStream stream) {
-        stream.get_module(Pubsub.Module.IDENTITY).add_filtered_notification(stream, NS_URI, true, on_pupsub_item, on_pupsub_retract);
+        stream.get_module(Pubsub.Module.IDENTITY).add_filtered_notification(stream, NS_URI, on_pupsub_item, on_pupsub_retract, null);
     }
 
     public override void detach(XmppStream stream) {

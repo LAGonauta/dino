@@ -38,17 +38,6 @@ public class Dino.Replies : StreamInteractionModule, Object {
         return null;
     }
 
-    public void set_message_is_reply_to(Message message, ContentItem reply_to) {
-        message.quoted_item_id = reply_to.id;
-
-        db.reply.upsert()
-                .value(db.reply.message_id, message.id, true)
-                .value(db.reply.quoted_content_item_id, reply_to.id)
-                .value_null(db.reply.quoted_message_stanza_id)
-                .value_null(db.reply.quoted_message_from)
-                .perform();
-    }
-
     private void on_incoming_message(Entities.Message message, Xmpp.MessageStanza stanza, Conversation conversation) {
         // Check if a previous message was in reply to this one
         var reply_qry = db.reply.select();
@@ -67,7 +56,7 @@ public class Dino.Replies : StreamInteractionModule, Object {
             ContentItem? message_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_item_by_foreign(conversation, 1, message.id);
             Message? reply_message = stream_interactor.get_module(MessageStorage.IDENTITY).get_message_by_id(reply_row[db.message.id], conversation);
             if (message_item != null && reply_message != null) {
-                set_message_is_reply_to(reply_message, message_item);
+                reply_message.set_quoted_item(message_item.id);
             }
         }
 
@@ -78,7 +67,7 @@ public class Dino.Replies : StreamInteractionModule, Object {
         ContentItem? quoted_content_item = stream_interactor.get_module(ContentItemStore.IDENTITY).get_content_item_for_message_id(conversation, reply_to.to_message_id);
         if (quoted_content_item == null) return;
 
-        set_message_is_reply_to(message, quoted_content_item);
+        message.set_quoted_item(quoted_content_item.id);
     }
 
     private class ReceivedMessageListener : MessageListener {
@@ -105,7 +94,8 @@ namespace Dino {
         string body = message.body;
         foreach (var fallback in message.get_fallbacks()) {
             if (fallback.ns_uri == Xep.Replies.NS_URI && message.quoted_item_id > 0) {
-                body = body[0:fallback.locations[0].from_char] + body[fallback.locations[0].to_char:body.length];
+                body = body[0:body.index_of_nth_char(fallback.locations[0].from_char)] +
+                        body[body.index_of_nth_char(fallback.locations[0].to_char):body.length];
             }
         }
         return body;

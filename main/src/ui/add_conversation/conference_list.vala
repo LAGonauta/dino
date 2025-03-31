@@ -103,6 +103,7 @@ internal class ConferenceListRow : ListRow {
         this.account = account;
         this.bookmark = bookmark;
 
+        status_dot.visible = false;
         name_label.label = bookmark.name != null && bookmark.name != "" ? bookmark.name : bookmark.jid.to_string();
         if (stream_interactor.get_accounts().size > 1) {
             via_label.label = "via " + account.bare_jid.to_string();
@@ -112,7 +113,7 @@ internal class ConferenceListRow : ListRow {
             via_label.visible = false;
         }
 
-        image.set_conversation(stream_interactor, new Conversation(jid, account, Conversation.Type.GROUPCHAT));
+        picture.model = new ViewModel.CompatAvatarPictureModel(stream_interactor).set_conversation(new Conversation(jid, account, Conversation.Type.GROUPCHAT));
     }
 }
 
