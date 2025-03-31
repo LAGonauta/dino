@@ -70,6 +70,7 @@ jobs:
             zip
             unzip
             curl
+            tree
             mingw-w64-${{matrix.env}}-toolchain
             mingw-w64-${{matrix.env}}-gcc
             mingw-w64-${{matrix.env}}-cmake
@@ -114,6 +115,7 @@ jobs:
         run: meson compile -C build
       - name: "Build Package"
         run: |
+          tree ./build
           mkdir dist && \
             cd dist && \
             mkdir ./bin ./etc ./lib ./share && \
