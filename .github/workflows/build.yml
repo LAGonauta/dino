@@ -109,7 +109,7 @@ jobs:
           echo '::add-matcher::${{ github.workspace }}/.github/matchers/vala-problem-matcher.json'
           echo '::add-matcher::${{ github.workspace }}/.github/matchers/meson-problem-matcher.json'
       - name: "Configure"
-        run: meson setup build
+        run: meson setup build --buildtype=release
       - name: "Build"
         run: meson compile -C build
       - name: "Build Package"
@@ -143,11 +143,22 @@ jobs:
             find . -iname "*.exe" -exec strip -s {} + && \
             find . -iname "*.dll" -exec strip -s {} + && \
             mv *.dll ./bin
-      - name: "Upload Dino for Windows"
+      - name: "Upload Dino for Windows package"
         uses: actions/upload-artifact@v4
         with:
           name: dino-windows-${{matrix.env}}
           path: dist/
+          if-no-files-found: error
+      - name : Build Windows installer
+        run: |
+          cd windows-installer/
+          cp -r LICENSE LICENSE_SHORT ../dist/* input/
+          makensis dino.nsi
+      - name: Upload Windows dino installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: dino-windows-${{matrix.env}}-installer
+          path: windows-installer/dino-installer.exe
           if-no-files-found: error
       - name: "Test"
         run: meson test -C build
