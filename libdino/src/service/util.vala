@@ -44,12 +44,15 @@ public class Util {
     public static void launch_default_for_uri(string file_uri)
     {
 #if _WIN32
-        // This should respect the mark of the web, unlike ShellExecute
-        string[] argv = { "explorer.exe", file_uri };
         try {
-            var process = new Subprocess.newv(argv, SubprocessFlags.NONE);
-            process.wait();
-        } catch (Error e) {
+            var file = File.new_for_path(file_uri);
+            if (file.query_exists()) {
+                // This should respect the mark of the web, unlike ShellExecute
+                string[] argv = { "explorer.exe", file_uri };
+                var process = new Subprocess.newv(argv, SubprocessFlags.NONE);
+                process.wait();
+            }
+        } catch(Error e) {
         }
 #else
         AppInfo.launch_default_for_uri(file_uri, null);
