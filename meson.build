@@ -1,4 +1,4 @@
-project('Dino', 'c', 'cpp', 'vala', license: 'GPL-3.0')
+project('Dino', 'c', 'cpp', 'vala', license: 'GPL-3.0', meson_version: '>=1.3.0')
 
 if host_machine.system() == 'windows'
     add_project_arguments('--define=_WIN32', language: ['vala'])
@@ -38,7 +38,7 @@ dep_gstreamer_rtp = dependency('gstreamer-rtp-1.0', disabler: true, required: ge
 dep_gstreamer_video = dependency('gstreamer-video-1.0', disabler: true, required: get_option('plugin-rtp'))
 dep_gtk4 = dependency('gtk4')
 dep_icu_uc = dependency('icu-uc')
-dep_libadwaita = dependency('libadwaita-1', version: '>=1.2')
+dep_libadwaita = dependency('libadwaita-1', version: '>=1.5')
 dep_libcanberra = dependency('libcanberra', disabler: true, required: get_option('plugin-notification-sound'))
 dep_libgcrypt = dependency('libgcrypt', disabler: true, required: plugin_crypto)
 dep_libqrencode = dependency('libqrencode', disabler: true, required: get_option('plugin-omemo'))
@@ -62,6 +62,14 @@ endif
 
 prog_git = find_program('git', required: false)
 prog_python = python.find_installation()
+
+if import('fs').is_file('VERSION') and meson.version().version_compare('>=1.4.0')
+    version_file = files('VERSION')[0]
+    version_file_path = version_file.full_path()
+else
+    version_file = 'invalid'
+    version_file_path = meson.current_source_dir() / 'VERSION'
+endif
 
 default_install_rpath = ''
 if get_option('set-install-rpath')

@@ -8,7 +8,7 @@ using Xmpp;
 namespace Dino.Ui.ManageAccounts {
 
 [GtkTemplate (ui = "/im/dino/Dino/preferences_window/add_account_dialog.ui")]
-public class AddAccountDialog : Adw.Window {
+public class AddAccountDialog : Adw.Dialog {
 
     public signal void added(Account account);
 
@@ -330,7 +330,7 @@ public class AddAccountDialog : Adw.Window {
         // Button is opening a registration website
         if (form.oob != null) {
             try {
-                Dino.Util.launch_default_for_uri(form.oob);
+                AppInfo.launch_default_for_uri(form.oob, null);
             } catch (Error e) { }
             show_sign_in();
             return;
